@@ -9,6 +9,7 @@ prism-core.workspace = true
 prism-net.workspace = true
 prism-auth.workspace = true
 tokio.workspace = true
+reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

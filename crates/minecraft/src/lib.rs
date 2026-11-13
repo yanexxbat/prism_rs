@@ -5,7 +5,9 @@
 pub mod assets;
 pub mod java;
 pub mod launch;
+pub mod loaders;
 pub mod meta;
+pub mod modplatform;
 pub mod pack_profile;
 pub mod version_file;
 
