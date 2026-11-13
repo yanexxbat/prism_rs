@@ -1,6 +1,7 @@
 //! Application state, background work and the main window.
 //! A simplified counterpart of `Application`, `MainWindow` and `LaunchController`.
 
+use crate::theme;
 use crate::windows::Windows;
 use crate::Cli;
 use eframe::egui;
@@ -79,6 +80,7 @@ pub struct App {
     pub running: BTreeMap<String, Running>,
     pub windows: Windows,
     cli: Option<Cli>,
+    themed: bool,
 }
 
 impl App {
@@ -103,6 +105,7 @@ impl App {
             running: BTreeMap::new(),
             windows: Windows::default(),
             cli: Some(cli).filter(|cli| cli.launch.is_some()),
+            themed: false,
         };
         app.reload();
         Ok(app)
@@ -311,7 +314,7 @@ impl App {
     }
 
     fn top_bar(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
+        egui::TopBottomPanel::top("toolbar").frame(theme::glass()).show_separator_line(false).show(ctx, |ui| {
             ui.horizontal(|ui| {
                 if ui.button("Add Instance").clicked() {
                     self.open_new_instance(ctx);
@@ -331,13 +334,16 @@ impl App {
                 });
             });
         });
-        egui::TopBottomPanel::bottom("status").show(ctx, |ui| {
+        egui::TopBottomPanel::bottom("status").frame(theme::glass().inner_margin(egui::Margin::symmetric(12, 6))).show_separator_line(false).show(ctx, |ui| {
             ui.label(if self.status.is_empty() { self.data_dir.display().to_string() } else { self.status.clone() });
         });
     }
 
     fn actions(&mut self, ctx: &egui::Context) {
-        egui::SidePanel::right("actions").exact_width(190.0).show(ctx, |ui| {
+        // The glass frame is drawn inside the panel: a side panel clips a frame's outer margin.
+        let panel = egui::SidePanel::right("actions").exact_width(214.0).frame(egui::Frame::NONE).show_separator_line(false);
+        panel.show(ctx, |ui| theme::glass().show(ui, |ui| {
+            ui.set_min_size(ui.available_size());
             let Some(id) = self.selected.clone() else {
                 ui.label("Select an instance.");
                 return;
@@ -352,7 +358,8 @@ impl App {
             let wide = |ui: &mut egui::Ui, enabled: bool, text: &str| {
                 ui.add_enabled(enabled, egui::Button::new(text).min_size(egui::vec2(170.0, 0.0))).clicked()
             };
-            if wide(ui, !is_running, "Launch") {
+            let launch = egui::Button::new(egui::RichText::new("Launch").strong()).fill(theme::ACCENT).min_size(egui::vec2(170.0, 34.0));
+            if ui.add_enabled(!is_running, launch).clicked() {
                 self.launch(ctx, &id, None, None, None);
             }
             if wide(ui, !is_running, "Launch Offline") {
@@ -380,11 +387,11 @@ impl App {
             if wide(ui, !is_running, "Delete") {
                 self.windows.confirm_delete = Some(id.clone());
             }
-        });
+        }));
     }
 
     fn instance_list(&mut self, ctx: &egui::Context) {
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().frame(theme::glass()).show(ctx, |ui| {
             if self.rows.is_empty() {
                 ui.label("No instances yet. Use \"Add Instance\" to create one.");
                 return;
@@ -448,6 +455,10 @@ impl eframe::App for App {
 impl App {
     /// One frame. Separate from `eframe::App::update` so tests can drive it without a window.
     pub fn ui(&mut self, ctx: &egui::Context) {
+        if !std::mem::replace(&mut self.themed, true) {
+            theme::apply(ctx);
+        }
+        theme::paint_background(ctx);
         while let Ok(msg) = self.rx.try_recv() {
             self.handle(msg, ctx);
         }

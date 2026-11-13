@@ -4,6 +4,7 @@
 mod app;
 #[cfg(test)]
 mod gui_tests;
+mod theme;
 mod windows;
 
 use std::path::PathBuf;
