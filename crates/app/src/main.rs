@@ -87,10 +87,17 @@ fn main() -> std::process::ExitCode {
         let runtime = tokio::runtime::Runtime::new().map_err(|e| format!("could not start the async runtime: {e}"))?;
         let state = app::App::new(runtime.handle().clone(), data_dir, cli).map_err(|e| e.to_string())?;
         let options = eframe::NativeOptions {
-            viewport: eframe::egui::ViewportBuilder::default().with_inner_size([960.0, 600.0]).with_title("prism_rs"),
+            viewport: eframe::egui::ViewportBuilder::default().with_inner_size([960.0, 600.0]).with_title("prism_rs").with_transparent(true),
             ..Default::default()
         };
-        eframe::run_native("prism_rs", options, Box::new(move |_| Ok(Box::new(state)))).map_err(|e| e.to_string())
+        eframe::run_native("prism_rs", options, Box::new(move |_creation| {
+            // Blurs the desktop behind the window. Without it the window is still see-through.
+            #[cfg(windows)]
+            if let Err(e) = window_vibrancy::apply_acrylic(_creation, Some((16, 18, 36, 90))) {
+                tracing::warn!("no acrylic blur: {e}");
+            }
+            Ok(Box::new(state))
+        })).map_err(|e| e.to_string())
     };
     match run() {
         Ok(()) => std::process::ExitCode::SUCCESS,

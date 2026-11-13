@@ -23,3 +23,6 @@ path = "src/main.rs"
 [dev-dependencies]
 egui_kittest = "0.31"
 tempfile.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+window-vibrancy = "0.5"

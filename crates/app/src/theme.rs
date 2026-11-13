@@ -3,6 +3,9 @@
 
 use eframe::egui::{self, Color32, CornerRadius, Frame, Margin, Shadow, Stroke};
 
+/// How much of the gradient covers the desktop behind the window (0 = clear, 255 = solid).
+const BACKDROP: u8 = 150;
+
 pub const ACCENT: Color32 = Color32::from_rgb(96, 148, 255);
 
 fn white(alpha: u8) -> Color32 {
@@ -66,10 +69,10 @@ pub fn paint_background(ctx: &egui::Context) {
     let painter = ctx.layer_painter(egui::LayerId::background());
     let mut mesh = egui::Mesh::default();
     let corners = [
-        (rect.left_top(), Color32::from_rgb(38, 30, 84)),
-        (rect.right_top(), Color32::from_rgb(20, 44, 92)),
-        (rect.left_bottom(), Color32::from_rgb(16, 22, 48)),
-        (rect.right_bottom(), Color32::from_rgb(14, 62, 78)),
+        (rect.left_top(), Color32::from_rgba_unmultiplied(38, 30, 84, BACKDROP)),
+        (rect.right_top(), Color32::from_rgba_unmultiplied(20, 44, 92, BACKDROP)),
+        (rect.left_bottom(), Color32::from_rgba_unmultiplied(16, 22, 48, BACKDROP)),
+        (rect.right_bottom(), Color32::from_rgba_unmultiplied(14, 62, 78, BACKDROP)),
     ];
     for (pos, color) in corners {
         mesh.colored_vertex(pos, color);
