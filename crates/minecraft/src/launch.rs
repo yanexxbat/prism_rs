@@ -492,10 +492,11 @@ pub async fn prepare(client: &Client, meta: &Meta, mut request: LaunchRequest<'_
             })?;
         }
         say(log, "Updating assets...");
-        let tenth = std::cell::Cell::new(0);
+        // Atomic rather than Cell so the launch future stays Send.
+        let tenth = std::sync::atomic::AtomicUsize::new(0);
         let progress = |done: usize, total: usize| {
-            if done * 10 / total.max(1) > tenth.get() {
-                tenth.set(done * 10 / total.max(1));
+            let now = done * 10 / total.max(1);
+            if now > tenth.swap(now, std::sync::atomic::Ordering::Relaxed) {
                 say(log, format!("Assets: {done} of {total}"));
             }
         };

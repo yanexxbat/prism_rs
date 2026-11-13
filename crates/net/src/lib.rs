@@ -136,8 +136,12 @@ impl Client {
     ) -> Result<()> {
         let total = downloads.len();
         let mut done = 0;
-        let mut stream =
-            futures_util::stream::iter(downloads).map(|d| self.download(d)).buffer_unordered(concurrency.max(1));
+        // Each future owns its client and download, so the whole call can run on another thread.
+        let jobs = downloads.iter().cloned().map(|download| {
+            let client = self.clone();
+            async move { client.download(&download).await }
+        });
+        let mut stream = futures_util::stream::iter(jobs).buffer_unordered(concurrency.max(1));
         while let Some(result) = stream.next().await {
             result?;
             done += 1;
