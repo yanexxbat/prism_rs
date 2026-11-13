@@ -358,7 +358,7 @@ impl App {
             let wide = |ui: &mut egui::Ui, enabled: bool, text: &str| {
                 ui.add_enabled(enabled, egui::Button::new(text).min_size(egui::vec2(170.0, 0.0))).clicked()
             };
-            let launch = egui::Button::new(egui::RichText::new("Launch").strong()).fill(theme::ACCENT).min_size(egui::vec2(170.0, 34.0));
+            let launch = egui::Button::new(egui::RichText::new("Launch").strong().color(theme::ON_ACCENT)).fill(theme::ACCENT).min_size(egui::vec2(170.0, 34.0));
             if ui.add_enabled(!is_running, launch).clicked() {
                 self.launch(ctx, &id, None, None, None);
             }

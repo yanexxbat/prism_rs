@@ -93,7 +93,7 @@ fn main() -> std::process::ExitCode {
         eframe::run_native("prism_rs", options, Box::new(move |_creation| {
             // Blurs the desktop behind the window. Without it the window is still see-through.
             #[cfg(windows)]
-            if let Err(e) = window_vibrancy::apply_acrylic(_creation, Some((16, 18, 36, 90))) {
+            if let Err(e) = window_vibrancy::apply_acrylic(_creation, Some((24, 24, 26, 110))) {
                 tracing::warn!("no acrylic blur: {e}");
             }
             Ok(Box::new(state))
