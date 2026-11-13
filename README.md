@@ -26,8 +26,8 @@ ships as a single `.exe`.
 - **Instances:** create, edit and delete; per-instance settings override global ones
 - **Versions and loaders:** vanilla, Fabric, Quilt, Forge and NeoForge, resolved from the
   Prism metadata server
-- **Launch:** same JVM arguments as Prism Launcher for the same instance, with a live log
-  window and tokens censored
+- **Launch:** JVM arguments matched Prism Launcher's own log in a side-by-side comparison;
+  live log window with tokens censored
 - **Accounts:** Microsoft device-code login and offline accounts
 - **Mods:** search, install and manage mods from Modrinth and CurseForge
 - **Compatible:** works on Prism Launcher instance folders (`--dir`)
