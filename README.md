@@ -101,7 +101,7 @@ because they are bound to Prism's client ID; log in again.
 
 ## Microsoft login
 
-No client ID is built in. Register your own application:
+A client ID is built in, so the login works without setup. To use your own application instead, register one:
 
 1. Open the [Azure portal](https://portal.azure.com), go to "Microsoft Entra ID" →
    "App registrations" → "New registration".
@@ -111,7 +111,7 @@ No client ID is built in. Register your own application:
 5. New applications must be approved for the Minecraft API before the login works. Ask
    for approval with the form at <https://aka.ms/mce-reviewappid>.
 
-Give the ID to the launcher in one of two ways:
+Give your own ID to the launcher in one of two ways:
 
 - environment variable `PRISM_RS_MSA_CLIENT_ID`
 - Settings → "Microsoft client ID" (stored as `MSAClientIDOverride` in `prismlauncher.cfg`

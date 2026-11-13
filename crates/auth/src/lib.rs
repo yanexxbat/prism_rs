@@ -37,12 +37,13 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// The project's own Microsoft application (client) ID. It identifies the app and is not a secret.
+pub const DEFAULT_MSA_CLIENT_ID: &str = "f5663236-e39b-423e-b0e0-b8fa648c4512";
+
 /// The Microsoft application (client) ID: the `PRISM_RS_MSA_CLIENT_ID` environment
-/// variable, else the `MSAClientIDOverride` setting. None is built in.
+/// variable, else the `MSAClientIDOverride` setting, else the built-in one.
 pub fn msa_client_id(setting: &str) -> Option<String> {
-    std::env::var("PRISM_RS_MSA_CLIENT_ID")
-        .ok()
-        .or_else(|| Some(setting.to_string()))
-        .map(|id| id.trim().to_string())
-        .filter(|id| !id.is_empty())
+    let custom = std::env::var("PRISM_RS_MSA_CLIENT_ID").ok().filter(|id| !id.trim().is_empty());
+    let id = custom.unwrap_or_else(|| setting.to_string());
+    Some(if id.trim().is_empty() { DEFAULT_MSA_CLIENT_ID.to_string() } else { id.trim().to_string() })
 }

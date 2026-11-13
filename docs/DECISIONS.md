@@ -43,13 +43,14 @@ The default data folder is `%APPDATA%\prism_rs` (`~/.local/share/prism_rs` elsew
 not Prism's folder, so the port never writes to an existing Prism installation unless
 asked to. `--dir <path>` points it at any folder with Prism's layout.
 
-## Client ID and API key come from the user
+## Client ID and API key
 
-No Microsoft client ID and no CurseForge API key are built in. They are read from the
+The Microsoft client ID of the original is not used. The port has its own built-in ID
+(`DEFAULT_MSA_CLIENT_ID`), added on the owner's request; it can be replaced. No CurseForge
+API key is built in. Both are read from the
 environment (`PRISM_RS_MSA_CLIENT_ID`, `PRISM_RS_CURSEFORGE_API_KEY`) or from the
 settings keys the original already has (`MSAClientIDOverride`, `FlameKeyOverride`).
-Without a client ID, Microsoft login is disabled; without an API key, CurseForge is
-disabled.
+Without an API key, CurseForge is disabled.
 
 ## Offline accounts keep the original's ownership rule
 
