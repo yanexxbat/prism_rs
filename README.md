@@ -1,15 +1,65 @@
+<div align="center">
+
 # prism_rs
 
-A Rust port of [Prism Launcher](https://github.com/PrismLauncher/PrismLauncher), the
-Minecraft launcher written in C++/Qt. It manages and starts Minecraft instances and reads
-and writes Prism's data formats (`instance.cfg`, `mmc-pack.json`, `accounts.json`, the
-metadata format of `meta.prismlauncher.org`), so instances made by Prism Launcher work.
+**A Minecraft launcher in Rust, ported from [Prism Launcher](https://github.com/PrismLauncher/PrismLauncher).**
 
-This is a derivative work under GPL-3.0. See `LICENSE` and `NOTICE.md`. It is not
-affiliated with the Prism Launcher project.
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org)
+[![Platform: Windows](https://img.shields.io/badge/platform-Windows%20x64-lightgrey.svg)](#download)
+[![Release](https://img.shields.io/github/v/release/yanexxbat/prism_rs)](https://github.com/yanexxbat/prism_rs/releases/latest)
 
-- `docs/ARCHITECTURE.md`: the modules of the original and where each one went
-- `docs/DECISIONS.md`: every place where the port does something simpler than the original
+</div>
+
+prism_rs manages and starts Minecraft instances. It reads and writes Prism Launcher's
+data formats (`instance.cfg`, `mmc-pack.json`, `accounts.json`, the metadata format of
+`meta.prismlauncher.org`), so instances made by Prism Launcher work. The original is
+C++/Qt; this port is Rust with an [egui](https://github.com/emilk/egui) interface and
+ships as a single `.exe`.
+
+> **Status: early release (v0.1.0).** The core flows work and were tested against the
+> real game on Windows (see [Tests](#tests)). Several features of the original are not
+> ported yet (see [What is missing](#what-is-missing)).
+
+## Highlights
+
+- **Instances:** create, edit and delete; per-instance settings override global ones
+- **Versions and loaders:** vanilla, Fabric, Quilt, Forge and NeoForge, resolved from the
+  Prism metadata server
+- **Launch:** same JVM arguments as Prism Launcher for the same instance, with a live log
+  window and tokens censored
+- **Accounts:** Microsoft device-code login and offline accounts
+- **Mods:** search, install and manage mods from Modrinth and CurseForge
+- **Compatible:** works on Prism Launcher instance folders (`--dir`)
+- **Command line:** launch an instance directly and join a server or world
+
+## Download
+
+Get `prism_rs-v0.1.0-windows-x64.zip` from the
+[latest release](https://github.com/yanexxbat/prism_rs/releases/latest), unzip it and run
+`prism_rs.exe`. The program is not code-signed, so Windows SmartScreen may warn on the
+first start. You need a Java runtime that fits your Minecraft version (see below).
+
+## Project layout
+
+| Crate | Purpose |
+|---|---|
+| `crates/core` | settings, INI files, instances, versions |
+| `crates/net` | downloads with checksum verification |
+| `crates/auth` | accounts, Microsoft/Xbox/Minecraft login, sessions |
+| `crates/minecraft` | metadata, components, libraries, assets, Java, launch, loaders, mod platforms |
+| `crates/app` | the egui GUI and the command line |
+
+More detail:
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): the modules of the original and where each one went
+- [`docs/DECISIONS.md`](docs/DECISIONS.md): every place where the port does something simpler than the original
+
+## Licence and origin
+
+This is a derivative work of Prism Launcher under GPL-3.0. See [`LICENSE`](LICENSE) and
+[`NOTICE.md`](NOTICE.md). It is not affiliated with the Prism Launcher project. "Minecraft"
+is a trademark of Mojang Synergies AB.
 
 ## Build on Windows
 
