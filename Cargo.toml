@@ -1,0 +1,30 @@
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/net", "crates/auth", "crates/minecraft", "crates/app"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-only"
+repository = "https://github.com/PrismLauncher/PrismLauncher"
+
+[workspace.dependencies]
+prism-core = { path = "crates/core" }
+prism-net = { path = "crates/net" }
+prism-auth = { path = "crates/auth" }
+prism-minecraft = { path = "crates/minecraft" }
+
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "io-util", "time", "fs", "sync"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "gzip", "stream"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+sha1 = "0.10"
+sha2 = "0.10"
+md-5 = "0.10"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+futures-util = "0.3"
+uuid = { version = "1", features = ["v4"] }
+tempfile = "3"

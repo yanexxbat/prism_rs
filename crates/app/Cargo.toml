@@ -1,0 +1,20 @@
+[package]
+name = "prism-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+prism-core.workspace = true
+prism-net.workspace = true
+prism-auth.workspace = true
+prism-minecraft.workspace = true
+tokio.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+eframe = { version = "0.31", default-features = false, features = ["default_fonts", "glow"] }
+
+[[bin]]
+name = "prism_rs"
+path = "src/main.rs"
