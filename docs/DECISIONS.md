@@ -83,3 +83,27 @@ fetched again, and the local copy is the fallback when the request fails.
 Jar mods, the legacy FML library task, pre-launch/wrapper/post-exit commands, instance
 import and export, instance groups editing, skins, world and screenshot management,
 translations, themes, the updater.
+
+## Smaller deviations
+
+- `MaxMemAlloc` defaults to 4096 MiB. The original uses RAM / 1.5 on machines with
+  less than 6 GB.
+- The log window always opens on launch. The original only shows it when `ShowConsole`
+  is set or the game crashes.
+- An account that does not own Minecraft cannot launch. The original offers the demo.
+- The Microsoft token response is not stored as a whole (`msa.extra` stays empty), and
+  the issue and expiry times of the two Xbox tokens are not parsed. Nothing reads them.
+- Deleting an instance or a mod only moves it to the recycle bin. If that fails, nothing
+  is deleted.
+- `lastLaunchTime` and play time are not recorded.
+- Instance groups from `instgroups.json` are shown but cannot be edited.
+- Keys in a saved INI file are sorted. Qt keeps the order in which keys were added.
+- The SRV lookup for "join server on launch" is not done; the address is passed as typed.
+
+## How the GUI is tested
+
+The UI code runs in `App::ui`, which needs no window. The tests in
+`crates/app/src/gui_tests.rs` drive it with `egui_kittest`: they find buttons and fields
+through egui's accessibility tree and click them. This is why the `accesskit` feature
+of eframe is enabled. A real window only repaints while it is visible, so scripted clicks
+on the window itself were not reliable.

@@ -24,7 +24,14 @@ use std::time::Duration;
 /// Log lines that only appear once the game has opened its window and is loading resources.
 const STARTED: [&str; 3] = ["Backend library", "Sound engine started", "OpenAL initialized"];
 
-async fn launch_latest_release(loader_uid: Option<&str>, must_log: &[&str]) {
+struct Setup {
+    data_dir: PathBuf,
+    global: Settings,
+    client: prism_net::Client,
+    meta: Meta,
+}
+
+fn setup() -> Setup {
     let data_dir = std::env::var_os("PRISM_RS_TEST_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../_testdata"));
@@ -33,9 +40,13 @@ async fn launch_latest_release(loader_uid: Option<&str>, must_log: &[&str]) {
     if let Ok(java_dir) = std::env::var("PRISM_RS_TEST_JAVA_DIR") {
         global.set("JavaDir", java_dir);
     }
-
     let client = prism_net::Client::new().expect("client");
     let meta = Meta::new(client.clone(), &data_dir, "");
+    Setup { data_dir, global, client, meta }
+}
+
+async fn launch_latest_release(loader_uid: Option<&str>, must_log: &[&str]) {
+    let Setup { data_dir, global, client, meta } = setup();
     let releases = meta.version_list("net.minecraft", false).await.expect("version list");
     let release = releases.versions.iter().find(|v| v.kind == "release").expect("a release").version.clone();
 
@@ -49,26 +60,32 @@ async fn launch_latest_release(loader_uid: Option<&str>, must_log: &[&str]) {
     };
     let name = format!("test-{}-{release}", if loader.is_some() { "fabric" } else { "vanilla" });
     let instances_dir = data_dir.join("instances");
-    let mut instance = match Instance::load(&instances_dir.join(&name)) {
+    let instance = match Instance::load(&instances_dir.join(&name)) {
         Ok(existing) if existing.root.join("mmc-pack.json").is_file() => existing,
         _ => {
             let loader = loader.as_ref().map(|(uid, version)| (uid.as_str(), version.as_str()));
             create_instance(&meta, &instances_dir, &name, &release, loader).await.expect("create instance")
         }
     };
+    run_instance(&Setup { data_dir, global, client, meta }, instance, must_log).await;
+}
+
+async fn run_instance(setup: &Setup, mut instance: Instance, must_log: &[&str]) {
+    let Setup { data_dir, global, client, meta } = setup;
+    let name = instance.id.clone();
 
     // An offline account in an online launch: files are downloaded, the token is "0".
     let session = AuthSession { offline: false, ..AuthSession::offline("prism_rs_test") };
     let (log, mut lines) = tokio::sync::mpsc::unbounded_channel();
     let request = LaunchRequest {
-        data_dir: &data_dir,
-        global: &global,
+        data_dir,
+        global,
         instance: &mut instance,
         session: &session,
         screen_size: None,
         target: None,
     };
-    let prepared = launch::prepare(&client, &meta, request, &log).await.expect("prepare launch");
+    let prepared = launch::prepare(client, meta, request, &log).await.expect("prepare launch");
     let command_line = prepared.censored_command_line();
     println!("COMMAND LINE: {command_line}");
     std::fs::write(data_dir.join(format!("{name}.cmdline.txt")), &command_line).expect("write command line");
@@ -109,4 +126,30 @@ async fn vanilla_release_starts() {
 #[ignore = "starts the real game"]
 async fn fabric_release_starts() {
     launch_latest_release(Some("net.fabricmc.fabric-loader"), &["with Fabric Loader"]).await;
+}
+
+/// An instance made by Prism Launcher itself: its `instance.cfg`, `mmc-pack.json` and
+/// `patches` are copied (nothing else, and nothing is written to the source) and launched.
+/// `PRISM_RS_TEST_INSTANCE` is the instance folder; without it the test does nothing.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "starts the real game"]
+async fn existing_prism_instance_starts() {
+    let Some(source) = std::env::var_os("PRISM_RS_TEST_INSTANCE").map(PathBuf::from) else {
+        println!("PRISM_RS_TEST_INSTANCE is not set; nothing to do");
+        return;
+    };
+    let setup = setup();
+    let name = format!("imported-{}", source.file_name().expect("instance folder name").to_string_lossy());
+    let target = setup.data_dir.join("instances").join(&name);
+    std::fs::create_dir_all(&target).expect("create target");
+    for file in ["instance.cfg", "mmc-pack.json"] {
+        std::fs::copy(source.join(file), target.join(file)).unwrap_or_else(|e| panic!("copy {file}: {e}"));
+    }
+    for patch in std::fs::read_dir(source.join("patches")).into_iter().flatten().flatten() {
+        std::fs::create_dir_all(target.join("patches")).expect("patches folder");
+        std::fs::copy(patch.path(), target.join("patches").join(patch.file_name())).expect("copy patch");
+    }
+    let instance = Instance::load(&target).expect("load copied instance");
+    println!("launching a copy of '{}'", instance.name());
+    run_instance(&setup, instance, &["Main class:"]).await;
 }
