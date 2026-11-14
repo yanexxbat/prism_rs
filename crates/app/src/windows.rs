@@ -40,6 +40,7 @@ struct SettingsDraft {
     client_id: String,
     curseforge_key: String,
     javas: Vec<JavaInstall>,
+    acrylic: bool,
 }
 
 struct InstanceEdit {
@@ -102,6 +103,26 @@ impl Windows {
     #[cfg(test)]
     pub fn close_all(&mut self) {
         *self = Windows::default();
+    }
+
+    /// The dialog the navigation shows as the current page, if any.
+    pub fn page(&self) -> Option<&'static str> {
+        if self.settings.is_some() {
+            Some("Settings")
+        } else if self.mods.is_some() {
+            Some("Mods")
+        } else if self.accounts_open {
+            Some("Accounts")
+        } else {
+            None
+        }
+    }
+
+    /// Back to the instance list: closes the dialogs the navigation opens.
+    pub fn close_pages(&mut self) {
+        self.settings = None;
+        self.mods = None;
+        self.accounts_open = false;
     }
 
     /// Results of background work that belong to a dialog.
@@ -227,6 +248,7 @@ impl App {
             client_id: get.get("MSAClientIDOverride"),
             curseforge_key: get.get("FlameKeyOverride"),
             javas: Vec::new(),
+            acrylic: get.get_bool("GlassAcrylic"),
         });
     }
 
@@ -325,7 +347,7 @@ impl App {
     fn new_instance_window(&mut self, ctx: &egui::Context) {
         let Some(mut dialog) = self.windows.new_instance.take() else { return };
         let (mut open, mut create, mut reload_loaders) = (true, false, false);
-        egui::Window::new("New Instance").open(&mut open).default_size([440.0, 480.0]).show(ctx, |ui| {
+        egui::Window::new("New Instance").constrain_to(self.panel).open(&mut open).default_size([440.0, 480.0]).show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.label("Name:");
                 ui.add(egui::TextEdit::singleline(&mut dialog.name).hint_text(dialog.minecraft.as_str()));
@@ -396,7 +418,7 @@ impl App {
         let (mut open, mut action) = (true, None);
         let windows = &mut self.windows;
         let accounts = &self.accounts.accounts;
-        egui::Window::new("Accounts").open(&mut open).default_width(520.0).show(ctx, |ui| {
+        egui::Window::new("Accounts").constrain_to(self.panel).open(&mut open).default_width(520.0).show(ctx, |ui| {
             egui::Grid::new("accounts").num_columns(5).striped(true).show(ui, |ui| {
                 for (index, account) in accounts.iter().enumerate() {
                     if ui.radio(account.active, "").on_hover_text("Default account").clicked() {
@@ -523,7 +545,7 @@ impl App {
     fn settings_window(&mut self, ctx: &egui::Context) {
         let Some(mut draft) = self.windows.settings.take() else { return };
         let (mut open, mut save, mut detect) = (true, false, false);
-        egui::Window::new("Settings").open(&mut open).default_width(520.0).show(ctx, |ui| {
+        egui::Window::new("Settings").constrain_to(self.panel).open(&mut open).default_width(520.0).show(ctx, |ui| {
             ui.strong("Java");
             ui.horizontal(|ui| {
                 ui.label("Java path:");
@@ -568,6 +590,9 @@ impl App {
             });
             ui.weak("Both are stored in prismlauncher.cfg in the data folder. Environment variables take precedence.");
             ui.separator();
+            ui.strong("Appearance");
+            ui.add_enabled(cfg!(windows), egui::Checkbox::new(&mut draft.acrylic, "Use the Windows acrylic blur instead of the built-in glass"));
+            ui.separator();
             save = ui.button("Save").clicked();
         });
         if detect {
@@ -587,6 +612,7 @@ impl App {
             global.set("AutomaticJavaSwitch", draft.auto_java);
             global.set("MSAClientIDOverride", draft.client_id.trim());
             global.set("FlameKeyOverride", draft.curseforge_key.trim());
+            global.set("GlassAcrylic", draft.acrylic);
             self.status = match global.save() {
                 Ok(()) => "Settings saved.".into(),
                 Err(e) => format!("Could not save settings: {e}"),
@@ -601,7 +627,7 @@ impl App {
         let Some(row) = self.row(&edit.id) else { return };
         let (current_loader, root) = (row.loader, row.instance.root.clone());
         let (mut open, mut save, mut apply_loader, mut reload_loaders) = (true, false, false, false);
-        egui::Window::new(format!("Edit {}", edit.id)).open(&mut open).default_width(520.0).show(ctx, |ui| {
+        egui::Window::new(format!("Edit {}", edit.id)).constrain_to(self.panel).open(&mut open).default_width(520.0).show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.label("Name:");
                 ui.text_edit_singleline(&mut edit.name);
@@ -702,7 +728,7 @@ impl App {
         let installed = installed_mods(&browser.mods_dir);
         let (mut open, mut search, mut pick, mut install) = (true, false, None, None);
         let (mut toggle, mut remove) = (None, None);
-        egui::Window::new(format!("Mods of {}", browser.instance_id)).open(&mut open).default_size([760.0, 520.0]).show(ctx, |ui| {
+        egui::Window::new(format!("Mods of {}", browser.instance_id)).constrain_to(self.panel).open(&mut open).default_size([760.0, 520.0]).show(ctx, |ui| {
             if browser.loaders.is_empty() {
                 ui.colored_label(ui.visuals().warn_fg_color, "This instance has no mod loader. Install one under Edit first.");
             }
@@ -822,7 +848,7 @@ impl App {
             return;
         };
         let mut open = true;
-        egui::Window::new(format!("Log of {id}")).open(&mut open).default_size([820.0, 460.0]).show(ctx, |ui| {
+        egui::Window::new(format!("Log of {id}")).constrain_to(self.panel).open(&mut open).default_size([820.0, 460.0]).show(ctx, |ui| {
             ui.horizontal(|ui| {
                 if ui.button("Copy").clicked() {
                     ui.ctx().copy_text(running.lines.join("\n"));
@@ -856,7 +882,7 @@ impl App {
         };
         let (name, root) = (row.instance.name(), row.instance.root.clone());
         let (mut delete, mut cancel) = (false, false);
-        egui::Window::new("Delete instance").collapsible(false).resizable(false).show(ctx, |ui| {
+        egui::Window::new("Delete instance").constrain_to(self.panel).collapsible(false).resizable(false).show(ctx, |ui| {
             ui.label(format!("Move the instance \"{name}\" with all its worlds and mods to the recycle bin?"));
             ui.label(root.display().to_string());
             ui.horizontal(|ui| {

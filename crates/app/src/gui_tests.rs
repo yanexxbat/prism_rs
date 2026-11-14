@@ -12,7 +12,7 @@ type Ui<'a> = Harness<'a, App>;
 
 fn harness(runtime: &tokio::runtime::Runtime, data_dir: &Path) -> Ui<'static> {
     let app = App::new(runtime.handle().clone(), data_dir.to_path_buf(), Cli::default()).expect("app");
-    let mut ui = Harness::builder().with_size([960.0, 600.0]).build_state(|ctx, app: &mut App| app.ui(ctx), app);
+    let mut ui = Harness::builder().with_size(crate::glass::window_size()).build_state(|ctx, app: &mut App| app.ui(ctx), app);
     ui.step();
     ui
 }
@@ -87,7 +87,7 @@ fn dialogs_work_without_network() {
     click(&mut ui, Role::Button, "Save");
     assert_eq!(ui.state().status, "Settings saved.");
     let cfg = std::fs::read_to_string(dir.path().join("prismlauncher.cfg")).expect("cfg");
-    assert!(cfg.contains("LaunchMaximized=true") && cfg.contains("MaxMemAlloc=4096"), "{cfg}");
+    assert!(cfg.contains("LaunchMaximized=true") && cfg.contains("MaxMemAlloc=4096") && cfg.contains("GlassAcrylic=false"), "{cfg}");
 
     // The instance editor writes override flags to instance.cfg.
     click(&mut ui, Role::Button, "Edit");
