@@ -115,13 +115,13 @@ The window is a pane of dark frosted glass: the desktop shows through it, blurre
 not follow the original's Qt themes. How it is built:
 
 - The window is undecorated and transparent. Windows' acrylic backdrop blurs what is
-  behind it; egui adds a smoky tint, a soft sheen from above, film grain and a light
+  behind it; egui adds a smoky tint, a soft sheen from above and a light
   1 px edge. On Windows the window is clipped (`SetWindowRgn`) to its rounded shape, so
   the corners are really transparent. Without acrylic (other systems, or if the call
   fails) the tint is denser, since the desktop would show through sharp.
 - The desktop behind the glass may be white, and text contrast comes first:
   `glass::tests::text_stays_readable_over_a_white_desktop` checks every text colour on a
-  white desktop (4.8:1 for the dimmest). That decides how dark the glass is; over a dark
+  white desktop (4.6:1 for the dimmest). That decides how dark the glass is; over a dark
   desktop it looks nearly black.
 - The glass repaints only when the UI changes; nothing animates while idle.
 

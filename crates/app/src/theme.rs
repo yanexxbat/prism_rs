@@ -8,9 +8,9 @@ use std::sync::Arc;
 pub const ACCENT: Color32 = Color32::from_rgb(236, 241, 248);
 pub const ON_ACCENT: Color32 = Color32::from_rgb(20, 21, 24);
 
-/// The smoky tint over the blurred desktop: rgba(20, 20, 24, 0.5), premultiplied. The desktop
+/// The smoky tint over the blurred desktop: rgba(20, 20, 24, 0.35), premultiplied. The desktop
 /// may be white, so it is as light as the text allows (`glass::tests` checks a white desktop).
-pub const GLASS_TINT: Color32 = Color32::from_rgba_premultiplied(10, 10, 12, 128);
+pub const GLASS_TINT: Color32 = Color32::from_rgba_premultiplied(7, 7, 8, 89);
 /// Where Windows does not blur, the desktop would show through sharp: a denser tint.
 pub const GLASS_TINT_UNBLURRED: Color32 = Color32::from_rgba_premultiplied(18, 18, 22, 222);
 /// Light falling on the glass from above, at the top edge; it fades out downwards.
@@ -18,8 +18,6 @@ pub const GLASS_SHEEN: Color32 = white(10);
 /// The panel's 1 px edge, and the brighter strip along its top.
 pub const GLASS_EDGE: Color32 = white(40);
 pub const GLASS_EDGE_TOP: Color32 = white(80);
-/// Strength of the film grain, as a fraction of full white or black.
-pub const GRAIN: f32 = 0.04;
 pub const PANEL_RADIUS: u8 = 28;
 
 /// Body text, nearly white.
@@ -27,7 +25,7 @@ pub const TEXT: Color32 = Color32::from_rgb(242, 242, 245);
 /// Bold titles: a muted light grey.
 pub const TEXT_TITLE: Color32 = Color32::from_rgb(226, 226, 231);
 /// Small captions, idle navigation, hints. The darkest text; `glass::tests` checks its contrast.
-pub const TEXT_DIM: Color32 = Color32::from_rgb(216, 216, 222);
+pub const TEXT_DIM: Color32 = Color32::from_rgb(225, 225, 230);
 
 /// Close, minimise, maximise. The only colour in the window, as on a Mac.
 pub const TRAFFIC_LIGHTS: [Color32; 3] = [Color32::from_rgb(255, 95, 87), Color32::from_rgb(254, 188, 46), Color32::from_rgb(40, 200, 64)];

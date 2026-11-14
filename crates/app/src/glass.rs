@@ -1,5 +1,5 @@
 //! The window as a pane of frosted glass: the desktop shows through, blurred by Windows'
-//! acrylic backdrop, under a smoky tint, a soft sheen, film grain and a light edge.
+//! acrylic backdrop, under a smoky tint, a soft sheen and a light edge.
 //! There is no system frame, so the Mac-style title bar and the edge resizing live here.
 
 use crate::theme::{self, white};
@@ -25,7 +25,6 @@ fn corner_radius(maximized: bool) -> CornerRadius {
 
 #[derive(Default)]
 pub struct Glass {
-    grain: Option<egui::TextureHandle>,
     /// Whether Windows blurs what is behind the window; `None` before the first frame (tests).
     blurred: Option<bool>,
     #[cfg(windows)]
@@ -67,19 +66,15 @@ impl Glass {
         }
     }
 
-    /// The tint, sheen, grain and edge of the glass, behind everything else.
+    /// The tint, sheen and edge of the glass, behind everything else.
     pub fn paint(&mut self, ctx: &egui::Context, panel: Rect) {
         let radius = corner_radius(maximized(ctx));
-        let grain = self.grain.get_or_insert_with(|| ctx.load_texture("grain", grain(), egui::TextureOptions::NEAREST_REPEAT));
         let painter = ctx.layer_painter(egui::LayerId::background());
         // Without the system blur the desktop would show through sharp, so the glass is denser.
         let tint = if self.blurred == Some(false) { theme::GLASS_TINT_UNBLURRED } else { theme::GLASS_TINT };
         painter.rect_filled(panel, radius, tint);
         // The sheen: light falling on the glass from above, fading out by a third of the way down.
         painter.add(sheen(panel, radius.nw as f32));
-        let tiles = panel.size() * ctx.pixels_per_point() / GRAIN_SIZE as f32;
-        let uv = Rect::from_min_size(pos2(0.0, 0.0), tiles);
-        painter.add(egui::epaint::RectShape::filled(panel, radius, Color32::WHITE).with_texture(grain.id(), uv));
         painter.rect_stroke(panel, radius, Stroke::new(1.0_f32, theme::GLASS_EDGE), egui::StrokeKind::Inside);
         let inset = radius.nw as f32;
         let top = panel.top() + 0.5;
@@ -90,8 +85,6 @@ impl Glass {
 /// The tint Windows lays over its acrylic blur, as RGBA.
 #[cfg_attr(not(windows), allow(dead_code))]
 pub const ACRYLIC_TINT: [u8; 4] = [16, 16, 20, 140];
-
-const GRAIN_SIZE: usize = 128;
 
 /// A vertical white-to-clear gradient over the top third of the panel, following the
 /// rounded top corners (egui has no gradient fill for rounded rectangles).
@@ -113,26 +106,6 @@ fn sheen(panel: Rect, radius: f32) -> egui::Mesh {
         }
     }
     mesh
-}
-
-/// Film grain: a fixed pattern of light and dark specks, `theme::GRAIN` strong.
-fn grain() -> egui::ColorImage {
-    let mut state = 0x2545_f491_u32;
-    let pixels = (0..GRAIN_SIZE * GRAIN_SIZE)
-        .map(|_| {
-            state ^= state << 13;
-            state ^= state >> 17;
-            state ^= state << 5;
-            let noise = (state as f32 / u32::MAX as f32) * 2.0 - 1.0;
-            let alpha = (noise.abs() * theme::GRAIN * 255.0).round() as u8;
-            if noise > 0.0 {
-                white(alpha)
-            } else {
-                Color32::from_black_alpha(alpha)
-            }
-        })
-        .collect();
-    egui::ColorImage { size: [GRAIN_SIZE, GRAIN_SIZE], pixels }
 }
 
 /// The Mac-style title bar across the top of `panel`: traffic lights on the left, the page
@@ -239,15 +212,14 @@ mod tests {
     }
 
     /// Lesbarkeit zuerst: the desktop behind the glass can be pure white. Every text colour
-    /// keeps 4.5:1 there, on the brightest spot: under the sheen, with the grain's light specks,
+    /// keeps 4.5:1 there, on the brightest spot: under the sheen,
     /// inside a selected tile, and in dialogs.
     #[test]
     fn text_stays_readable_over_a_white_desktop() {
-        let grain = white((theme::GRAIN * 255.0).round() as u8);
         let [r, g, b, a] = ACRYLIC_TINT;
         let blurred = over(Color32::WHITE, Color32::from_rgba_unmultiplied(r, g, b, a));
-        let glass = |tint| over(over(over(blurred, tint), theme::GLASS_SHEEN), grain);
-        let unblurred = over(over(over(Color32::WHITE, theme::GLASS_TINT_UNBLURRED), theme::GLASS_SHEEN), grain);
+        let glass = |tint| over(over(blurred, tint), theme::GLASS_SHEEN);
+        let unblurred = over(over(Color32::WHITE, theme::GLASS_TINT_UNBLURRED), theme::GLASS_SHEEN);
         let ctx = egui::Context::default();
         theme::apply(&ctx);
         let visuals = ctx.style().visuals.clone();
@@ -265,15 +237,6 @@ mod tests {
             }
         }
         println!("white desktop through the glass: {:?}, TEXT_DIM {:.2}:1", glass(theme::GLASS_TINT), theme::contrast(theme::TEXT_DIM, over(glass(theme::GLASS_TINT), white(6))));
-    }
-
-    #[test]
-    fn grain_is_faint_and_balanced() {
-        let image = grain();
-        let max = image.pixels.iter().map(|p| p.a()).max().unwrap_or(0);
-        assert!(max as f32 <= theme::GRAIN * 255.0 + 1.0 && max > 0);
-        let light = image.pixels.iter().filter(|p| p.r() > 0).count() as f32 / image.pixels.len() as f32;
-        assert!((light - 0.5).abs() < 0.05, "{light}");
     }
 
     #[test]
