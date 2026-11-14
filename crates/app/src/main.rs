@@ -4,6 +4,7 @@
 #[cfg(windows)]
 mod acrylic;
 mod app;
+mod blur;
 #[cfg(test)]
 mod gui_tests;
 mod theme;
