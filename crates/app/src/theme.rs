@@ -1,88 +1,247 @@
-//! The look: smoked, frosted glass. Neutral greys, thin light edges, flat outlined controls.
-//! The blur comes from the window's acrylic backdrop (see `main.rs`); egui only adds the tint.
+//! The look: the window is a pane of dark frosted glass over the desktop (see `glass.rs`).
+//! Every colour lives here. One accent only, a cool white; the rest is grey.
 
-use eframe::egui::{self, Color32, CornerRadius, Frame, Margin, Shadow, Stroke};
+use eframe::egui::{self, Color32, CornerRadius, FontFamily, FontId, Frame, Margin, Shadow, Stroke, TextStyle};
+use std::sync::Arc;
 
-/// The one highlighted control (Launch): light on dark, like the rest of the type.
-pub const ACCENT: Color32 = Color32::from_rgb(232, 232, 236);
-pub const ON_ACCENT: Color32 = Color32::from_rgb(24, 24, 27);
+/// The one highlighted control (Launch): cool white with dark text.
+pub const ACCENT: Color32 = Color32::from_rgb(236, 241, 248);
+pub const ON_ACCENT: Color32 = Color32::from_rgb(20, 21, 24);
 
-/// How much of the smoke tint covers the blurred desktop (0 = clear, 255 = solid).
-const BACKDROP: u8 = 10;
+/// The smoky tint over the blurred desktop: rgba(20, 20, 24, 0.25), premultiplied. Clear on
+/// request: text keeps 4.5:1 over light grey, less over pure white (see `glass::tests`).
+pub const GLASS_TINT: Color32 = Color32::from_rgba_premultiplied(5, 5, 6, 64);
+/// Where Windows does not blur, the desktop would show through sharp: a denser tint.
+pub const GLASS_TINT_UNBLURRED: Color32 = Color32::from_rgba_premultiplied(18, 18, 22, 222);
+/// Light falling on the glass from above, at the top edge; it fades out downwards.
+pub const GLASS_SHEEN: Color32 = white(10);
+/// The panel's 1 px edge, and the brighter strip along its top.
+pub const GLASS_EDGE: Color32 = white(40);
+pub const GLASS_EDGE_TOP: Color32 = white(80);
+pub const PANEL_RADIUS: u8 = 28;
 
-const TEXT: Color32 = Color32::from_rgb(226, 226, 230);
-const TEXT_DIM: Color32 = Color32::from_rgb(160, 160, 168);
+/// Body text, nearly white.
+pub const TEXT: Color32 = Color32::from_rgb(242, 242, 245);
+/// Bold titles: a muted light grey.
+pub const TEXT_TITLE: Color32 = Color32::from_rgb(226, 226, 231);
+/// Small captions, idle navigation, hints. The darkest text; `glass::tests` checks its contrast.
+pub const TEXT_DIM: Color32 = Color32::from_rgb(225, 225, 230);
 
-fn white(alpha: u8) -> Color32 {
-    Color32::from_rgba_unmultiplied(255, 255, 255, alpha)
+/// The close button on hover and while pressed, as on Windows. The only colour in the window.
+pub const CLOSE_HOVER: Color32 = Color32::from_rgb(196, 43, 28);
+pub const CLOSE_PRESSED: Color32 = Color32::from_rgb(160, 36, 24);
+
+/// White at the given opacity (premultiplied, so all four channels are equal).
+pub const fn white(alpha: u8) -> Color32 {
+    Color32::from_rgba_premultiplied(alpha, alpha, alpha, alpha)
+}
+
+const LIGHT: &str = "light";
+const SEMIBOLD: &str = "semibold";
+
+/// Poppins (SIL Open Font License 1.1, see `assets/fonts/OFL.txt`), with egui's own fonts
+/// behind it for the symbols Poppins does not have.
+fn fonts() -> egui::FontDefinitions {
+    let mut fonts = egui::FontDefinitions::default();
+    for (name, bytes) in [
+        ("Poppins-Light", &include_bytes!("../assets/fonts/Poppins-Light.ttf")[..]),
+        ("Poppins-Regular", &include_bytes!("../assets/fonts/Poppins-Regular.ttf")[..]),
+        ("Poppins-SemiBold", &include_bytes!("../assets/fonts/Poppins-SemiBold.ttf")[..]),
+    ] {
+        fonts.font_data.insert(name.into(), Arc::new(egui::FontData::from_static(bytes)));
+    }
+    let fallbacks = fonts.families[&FontFamily::Proportional].clone();
+    for (family, font) in [
+        (FontFamily::Proportional, "Poppins-Regular"),
+        (FontFamily::Name(LIGHT.into()), "Poppins-Light"),
+        (FontFamily::Name(SEMIBOLD.into()), "Poppins-SemiBold"),
+    ] {
+        let list = std::iter::once(font.to_string()).chain(fallbacks.iter().cloned()).collect();
+        fonts.families.insert(family, list);
+    }
+    fonts
 }
 
 /// Set once at startup.
 pub fn apply(ctx: &egui::Context) {
+    ctx.set_fonts(fonts());
     let mut style = (*ctx.style()).clone();
+    style.text_styles = [
+        (TextStyle::Small, FontId::proportional(11.0)),
+        (TextStyle::Body, FontId::proportional(13.0)),
+        (TextStyle::Button, FontId::proportional(13.0)),
+        (TextStyle::Heading, FontId::new(19.0, FontFamily::Name(SEMIBOLD.into()))),
+        (TextStyle::Monospace, FontId::monospace(12.5)),
+    ]
+    .into();
     style.spacing.item_spacing = egui::vec2(10.0, 9.0);
-    style.spacing.button_padding = egui::vec2(14.0, 6.0);
-    style.spacing.window_margin = Margin::same(16);
+    style.spacing.button_padding = egui::vec2(16.0, 6.0);
+    style.spacing.interact_size.y = 26.0;
+    style.spacing.window_margin = Margin::same(18);
 
     let visuals = &mut style.visuals;
     *visuals = egui::Visuals::dark();
     visuals.override_text_color = Some(TEXT);
     visuals.panel_fill = Color32::TRANSPARENT;
-    // Dialogs are denser than the window so text stays readable over whatever is behind.
-    visuals.window_fill = Color32::from_rgba_unmultiplied(30, 30, 33, 240);
+    // Dialogs are denser glass so their text stays readable over the panel and the chrome.
+    visuals.window_fill = Color32::from_rgba_unmultiplied(30, 30, 32, 246);
     visuals.window_stroke = Stroke::new(1.0_f32, white(38));
-    visuals.window_corner_radius = CornerRadius::same(16);
-    visuals.window_shadow = Shadow { offset: [0, 12], blur: 36, spread: 0, color: Color32::from_black_alpha(120) };
-    visuals.popup_shadow = visuals.window_shadow;
-    visuals.menu_corner_radius = CornerRadius::same(10);
-    visuals.extreme_bg_color = Color32::from_rgba_unmultiplied(0, 0, 0, 70); // text fields
+    visuals.window_corner_radius = CornerRadius::same(20);
+    visuals.window_shadow = Shadow { offset: [0, 16], blur: 40, spread: 0, color: Color32::from_black_alpha(140) };
+    visuals.popup_shadow = Shadow { offset: [0, 8], blur: 24, spread: 0, color: Color32::from_black_alpha(120) };
+    visuals.menu_corner_radius = CornerRadius::same(12);
+    visuals.extreme_bg_color = Color32::from_rgba_unmultiplied(0, 0, 0, 60); // text fields
     visuals.faint_bg_color = white(6);
-    visuals.selection.bg_fill = white(34);
-    visuals.selection.stroke = Stroke::new(1.0_f32, Color32::WHITE);
-    visuals.hyperlink_color = Color32::WHITE;
+    visuals.selection.bg_fill = white(40);
+    visuals.selection.stroke = Stroke::new(1.0_f32, white(220)); // the focused text field's edge
+    visuals.hyperlink_color = ACCENT;
 
-    // Flat and outlined: a hairline at rest, a light wash on hover, no size change.
+    // Glass pills: clear at rest with a light hairline, a lighter wash on hover, brighter when held.
     let widgets = &mut visuals.widgets;
     for (state, fill, edge, text) in [
-        (&mut widgets.inactive, 0, 42, TEXT),
-        (&mut widgets.hovered, 18, 90, Color32::WHITE),
-        (&mut widgets.active, 34, 130, Color32::WHITE),
-        (&mut widgets.open, 18, 90, Color32::WHITE),
+        (&mut widgets.inactive, 4, 56, TEXT),
+        (&mut widgets.hovered, 20, 110, Color32::WHITE),
+        (&mut widgets.active, 36, 200, Color32::WHITE),
+        (&mut widgets.open, 20, 110, Color32::WHITE),
     ] {
         state.bg_fill = white(fill);
         state.weak_bg_fill = white(fill);
         state.bg_stroke = Stroke::new(1.0_f32, white(edge));
-        state.corner_radius = CornerRadius::same(8);
+        state.corner_radius = CornerRadius::same(255);
         state.expansion = 0.0;
         state.fg_stroke = Stroke::new(1.0_f32, text);
     }
-    widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, white(24)); // separators
+    widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, white(26)); // separators
     widgets.noninteractive.fg_stroke = Stroke::new(1.0_f32, TEXT_DIM);
-    widgets.noninteractive.corner_radius = CornerRadius::same(8);
+    // egui greys out weak and disabled text half way towards this; lighter keeps it at 4.5:1 or more.
+    widgets.noninteractive.weak_bg_fill = Color32::from_gray(80);
+    widgets.noninteractive.corner_radius = CornerRadius::same(10);
     ctx.set_style(style);
 }
 
-/// The frame of a main-window panel: a barely lighter pane with a hairline edge.
-pub fn glass() -> Frame {
-    Frame::new()
-        .fill(white(5))
-        .stroke(Stroke::new(1.0_f32, white(26)))
-        .corner_radius(CornerRadius::same(16))
-        .inner_margin(Margin::same(14))
-        .outer_margin(Margin::same(6))
+/// The page title: bold, muted grey.
+pub fn title(text: &str) -> egui::RichText {
+    egui::RichText::new(text).family(FontFamily::Name(SEMIBOLD.into())).size(26.0).color(TEXT_TITLE)
 }
 
-/// The smoke tint over the blurred desktop, a little lighter towards the top.
-pub fn paint_background(ctx: &egui::Context) {
-    let rect = ctx.screen_rect();
-    let painter = ctx.layer_painter(egui::LayerId::background());
-    let top = Color32::from_rgba_unmultiplied(44, 44, 48, BACKDROP);
-    let bottom = Color32::from_rgba_unmultiplied(22, 22, 24, BACKDROP);
-    let mut mesh = egui::Mesh::default();
-    for (pos, color) in [(rect.left_top(), top), (rect.right_top(), top), (rect.left_bottom(), bottom), (rect.right_bottom(), bottom)] {
-        mesh.colored_vertex(pos, color);
+/// Under a title: thin and light.
+pub fn subtitle(text: impl Into<String>) -> egui::RichText {
+    egui::RichText::new(text).family(FontFamily::Name(LIGHT.into())).size(14.0).color(TEXT)
+}
+
+/// Small grey text.
+pub fn caption(text: impl Into<String>) -> egui::RichText {
+    egui::RichText::new(text).size(11.5).color(TEXT_DIM)
+}
+
+pub fn semibold(size: f32) -> FontId {
+    FontId::new(size, FontFamily::Name(SEMIBOLD.into()))
+}
+
+/// Upper-case text with wide letter spacing (navigation, badges).
+fn spaced(ui: &egui::Ui, text: &str, size: f32, spacing: f32, color: Color32) -> Arc<egui::Galley> {
+    let mut job = egui::text::LayoutJob::default();
+    let format = egui::TextFormat { font_id: FontId::proportional(size), extra_letter_spacing: spacing, color, ..Default::default() };
+    job.append(&text.to_uppercase(), 0.0, format);
+    ui.fonts(|fonts| fonts.layout_job(job))
+}
+
+/// A small outlined box, like "4K" or "PSD" in a product shot.
+pub fn badge(ui: &mut egui::Ui, text: &str) -> egui::Response {
+    let size = badge_galley(ui, text).size() + BADGE_PADDING;
+    let (rect, response) = ui.allocate_exact_size(size, egui::Sense::hover());
+    paint_badge(ui, rect.min, text);
+    response
+}
+
+const BADGE_PADDING: egui::Vec2 = egui::vec2(10.0, 4.0);
+
+fn badge_galley(ui: &egui::Ui, text: &str) -> Arc<egui::Galley> {
+    spaced(ui, text, 10.0, 0.8, TEXT)
+}
+
+/// Paints a badge with its top-left corner at `pos`; returns its width.
+pub fn paint_badge(ui: &egui::Ui, pos: egui::Pos2, text: &str) -> f32 {
+    let galley = badge_galley(ui, text);
+    let rect = egui::Rect::from_min_size(pos, galley.size() + BADGE_PADDING);
+    let painter = ui.painter();
+    painter.rect_stroke(rect, CornerRadius::same(4), Stroke::new(1.0_f32, white(120)), egui::StrokeKind::Inside);
+    painter.galley(rect.center() - galley.size() / 2.0, galley, TEXT);
+    rect.width()
+}
+
+/// A navigation entry: spaced capitals, bright when active, grey otherwise.
+/// `name` is what screen readers and the tests see.
+pub fn nav(ui: &mut egui::Ui, name: &str, active: bool, enabled: bool) -> egui::Response {
+    let galley = spaced(ui, name, 11.5, 2.0, TEXT);
+    let sense = if enabled { egui::Sense::click() } else { egui::Sense::hover() };
+    let (rect, response) = ui.allocate_exact_size(galley.size() + egui::vec2(4.0, 10.0), sense);
+    let color = match (active, response.hovered() && enabled, enabled) {
+        (true, _, _) => Color32::WHITE,
+        (_, true, _) => TEXT,
+        (_, _, true) => TEXT_DIM,
+        _ => TEXT_DIM.gamma_multiply(0.55),
+    };
+    let painter = ui.painter();
+    if active {
+        // A soft glow under the active entry.
+        let line = egui::Rect::from_center_size(rect.center_bottom() - egui::vec2(0.0, 1.0), egui::vec2(rect.width() * 0.6, 1.0));
+        painter.add(Shadow { offset: [0, 0], blur: 10, spread: 0, color: white(70) }.as_shape(line, CornerRadius::ZERO));
+        painter.rect_filled(line, CornerRadius::ZERO, white(160));
     }
-    mesh.add_triangle(0, 1, 2);
-    mesh.add_triangle(1, 2, 3);
-    painter.add(mesh);
+    painter.galley_with_override_text_color(rect.center() - galley.size() / 2.0, galley, color);
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, name));
+    response
+}
+
+/// A round white icon button. `primary` fills it with the accent and gives it a glow.
+pub fn icon_button(ui: &mut egui::Ui, icon: &str, name: &str, primary: bool, enabled: bool) -> egui::Response {
+    let size = if primary { 38.0 } else { 32.0 };
+    let sense = if enabled { egui::Sense::click() } else { egui::Sense::hover() };
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(size, size), sense);
+    let hot = enabled && response.hovered();
+    let painter = ui.painter();
+    let (fill, edge, glyph) = match (primary, enabled) {
+        (true, true) => (if hot { Color32::WHITE } else { ACCENT }, Color32::WHITE, ON_ACCENT),
+        (true, false) => (white(40), white(60), white(110)),
+        (false, _) => (white(if hot { 26 } else { 6 }), white(if hot { 150 } else { 70 }), if enabled { Color32::WHITE } else { white(90) }),
+    };
+    if primary && enabled {
+        painter.add(Shadow { offset: [0, 0], blur: 22, spread: 1, color: white(if hot { 90 } else { 55 }) }.as_shape(rect, CornerRadius::same(255)));
+    }
+    painter.circle(rect.center(), size / 2.0 - 0.5, fill, Stroke::new(1.0_f32, edge));
+    painter.text(rect.center(), egui::Align2::CENTER_CENTER, icon, FontId::proportional(if primary { 15.0 } else { 14.0 }), glyph);
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, name));
+    response.on_hover_text(name)
+}
+
+/// A smaller glass tile inside the panel (instance details), with the panel's edge.
+pub fn tile() -> Frame {
+    Frame::new()
+        .fill(white(6))
+        .stroke(Stroke::new(1.0_f32, white(30)))
+        .corner_radius(CornerRadius::same(20))
+        .inner_margin(Margin::same(16))
+}
+
+/// WCAG contrast ratio of two opaque colours.
+#[cfg(test)]
+pub fn contrast(a: Color32, b: Color32) -> f32 {
+    let luminance = |c: Color32| {
+        let [r, g, b, _] = egui::Rgba::from(c).to_array();
+        0.2126 * r + 0.7152 * g + 0.0722 * b
+    };
+    let (la, lb) = (luminance(a), luminance(b));
+    (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn contrast_matches_wcag() {
+        assert!((contrast(Color32::WHITE, Color32::BLACK) - 21.0).abs() < 0.01);
+        assert!((contrast(Color32::from_gray(118), Color32::WHITE) - 4.54).abs() < 0.05);
+    }
 }

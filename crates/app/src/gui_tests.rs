@@ -12,7 +12,7 @@ type Ui<'a> = Harness<'a, App>;
 
 fn harness(runtime: &tokio::runtime::Runtime, data_dir: &Path) -> Ui<'static> {
     let app = App::new(runtime.handle().clone(), data_dir.to_path_buf(), Cli::default()).expect("app");
-    let mut ui = Harness::builder().with_size([960.0, 600.0]).build_state(|ctx, app: &mut App| app.ui(ctx), app);
+    let mut ui = Harness::builder().with_size(crate::glass::window_size()).build_state(|ctx, app: &mut App| app.ui(ctx), app);
     ui.step();
     ui
 }
@@ -105,6 +105,39 @@ fn dialogs_work_without_network() {
     // The mod browser says why it cannot search for a vanilla instance.
     click(&mut ui, Role::Button, "Mods");
     assert!(ui.query_by_label_contains("no mod loader").is_some());
+}
+
+/// The glass and the instance list, rendered with wgpu and compared with
+/// `tests/snapshots/glass_panel.png` (over transparency: the desktop and its blur exist only
+/// in the real window). After a deliberate change of the look:
+///
+/// ```text
+/// UPDATE_SNAPSHOTS=1 cargo test -p prism-app glass_panel
+/// ```
+#[test]
+fn glass_panel_snapshot() {
+    let runtime = tokio::runtime::Runtime::new().expect("runtime");
+    let dir = tempfile::tempdir().expect("tempdir");
+    let instances = dir.path().join("instances");
+    for (name, pack) in [
+        ("Survival", r#"{"uid":"net.minecraft","version":"1.21.1"},{"uid":"net.fabricmc.fabric-loader","version":"0.16.9"}"#),
+        ("Vanilla", r#"{"uid":"net.minecraft","version":"1.20.1"}"#),
+    ] {
+        let instance = prism_core::instance::create_instance(&instances, name).expect("instance");
+        let pack = format!(r#"{{"components":[{pack}],"formatVersion":1}}"#);
+        std::fs::write(instance.root.join("mmc-pack.json"), pack).expect("pack");
+    }
+    let app = App::new(runtime.handle().clone(), dir.path().to_path_buf(), Cli::default()).expect("app");
+    let mut ui = Harness::builder().with_size(crate::glass::window_size()).wgpu().build_state(|ctx, app: &mut App| app.ui(ctx), app);
+    ui.step();
+    click_containing(&mut ui, "Survival   [1.21.1, Fabric]");
+    ui.state_mut().status = "Ready.".into(); // instead of the temporary folder's path
+    ui.step();
+    // An idle window settles: no widget keeps moving and nothing asks for another frame.
+    if let Err(e) = ui.try_run() {
+        panic!("the idle window keeps repainting: {e}");
+    }
+    ui.snapshot("glass_panel");
 }
 
 /// The whole path a user takes: create a Fabric instance, install a mod, launch, read the log, kill.

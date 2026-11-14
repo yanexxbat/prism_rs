@@ -4,6 +4,7 @@
 #[cfg(windows)]
 mod acrylic;
 mod app;
+mod glass;
 #[cfg(test)]
 mod gui_tests;
 mod theme;
@@ -89,15 +90,15 @@ fn main() -> std::process::ExitCode {
         let runtime = tokio::runtime::Runtime::new().map_err(|e| format!("could not start the async runtime: {e}"))?;
         let state = app::App::new(runtime.handle().clone(), data_dir, cli).map_err(|e| e.to_string())?;
         let options = eframe::NativeOptions {
-            viewport: eframe::egui::ViewportBuilder::default().with_inner_size([960.0, 600.0]).with_title("prism_rs").with_transparent(true),
+            viewport: eframe::egui::ViewportBuilder::default()
+                .with_inner_size(glass::window_size())
+                .with_min_inner_size(glass::min_window_size())
+                .with_title("prism_rs")
+                .with_transparent(true)
+                .with_decorations(false),
             ..Default::default()
         };
         eframe::run_native("prism_rs", options, Box::new(move |_creation| {
-            // Without the blur the window is still see-through, only sharp.
-            #[cfg(windows)]
-            if !acrylic::enable(_creation, [28, 28, 31, 96]) {
-                tracing::warn!("no blur behind the window");
-            }
             Ok(Box::new(state))
         })).map_err(|e| e.to_string())
     };

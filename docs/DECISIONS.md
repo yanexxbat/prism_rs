@@ -109,10 +109,33 @@ through egui's accessibility tree and click them. This is why the `accesskit` fe
 of eframe is enabled. A real window only repaints while it is visible, so scripted clicks
 on the window itself were not reliable.
 
-## The one `unsafe` block
+## The glass look
 
-`crates/app/src/acrylic.rs` calls `SetWindowCompositionAttribute` from user32 to blur
-what is behind the window. It is undocumented, so it needs raw FFI. The documented
-ways were tried first and are opaque on Windows 11: the system backdrop goes solid when
-the window is inactive, and the plain blur accent renders as a dark layer. If the call
-is missing, the window stays see-through without blur.
+The window is a pane of dark frosted glass: the desktop shows through it, blurred. It does
+not follow the original's Qt themes. How it is built:
+
+- The window is undecorated and transparent. Windows' acrylic backdrop blurs what is
+  behind it; egui adds a smoky tint, a soft sheen from above and a light
+  1 px edge. On Windows the window is clipped (`SetWindowRgn`) to its rounded shape, so
+  the corners are really transparent. Without acrylic (other systems, or if the call
+  fails) the tint is denser, since the desktop would show through sharp.
+- The glass is as clear as the user asked for (tint 0.25).
+  `glass::tests::text_stays_readable_over_a_light_desktop` checks every text colour: at
+  least 4.5:1 over a light grey desktop (#C8C8C8, 5.3:1 for the dimmest), but only 4.0:1
+  over pure white, which is below WCAG AA. That trade was made on purpose.
+- The glass repaints only when the UI changes; nothing animates while idle.
+
+Changes of layout, not of function: the toolbar became a header with a title, the
+"Add Instance" and "Reload" buttons and a navigation (Instances, Accounts, Mods, Settings).
+"Mods" moved from the instance actions into the navigation and needs a selected instance.
+Launch, Folder, Log and Edit are round icons at the bottom right of the instance details;
+their accessible names are unchanged, as are the instance tiles' (the old list text).
+
+## `unsafe` code
+
+- `crates/app/src/acrylic.rs` calls `SetWindowCompositionAttribute` from user32 to blur
+  what is behind the window. It is undocumented, so it needs raw FFI. The documented
+  ways were tried first and are opaque on Windows 11: the system backdrop goes solid when
+  the window is inactive, and the plain blur accent renders as a dark layer. If the call
+  is missing, the window stays see-through without blur. The same file clips the window
+  with GDI regions.

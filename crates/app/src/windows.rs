@@ -104,6 +104,26 @@ impl Windows {
         *self = Windows::default();
     }
 
+    /// The dialog the navigation shows as the current page, if any.
+    pub fn page(&self) -> Option<&'static str> {
+        if self.settings.is_some() {
+            Some("Settings")
+        } else if self.mods.is_some() {
+            Some("Mods")
+        } else if self.accounts_open {
+            Some("Accounts")
+        } else {
+            None
+        }
+    }
+
+    /// Back to the instance list: closes the dialogs the navigation opens.
+    pub fn close_pages(&mut self) {
+        self.settings = None;
+        self.mods = None;
+        self.accounts_open = false;
+    }
+
     /// Results of background work that belong to a dialog.
     pub fn handle(&mut self, msg: Msg, accounts: &mut AccountList, status: &mut String) {
         match msg {

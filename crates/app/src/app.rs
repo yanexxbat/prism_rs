@@ -1,6 +1,7 @@
 //! Application state, background work and the main window.
 //! A simplified counterpart of `Application`, `MainWindow` and `LaunchController`.
 
+use crate::glass::{self, Glass};
 use crate::theme;
 use crate::windows::Windows;
 use crate::Cli;
@@ -81,6 +82,7 @@ pub struct App {
     pub windows: Windows,
     cli: Option<Cli>,
     themed: bool,
+    pub glass: Glass,
 }
 
 impl App {
@@ -106,6 +108,7 @@ impl App {
             windows: Windows::default(),
             cli: Some(cli).filter(|cli| cli.launch.is_some()),
             themed: false,
+            glass: Glass::default(),
         };
         app.reload();
         Ok(app)
@@ -313,105 +316,141 @@ impl App {
         }
     }
 
-    fn top_bar(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::top("toolbar").frame(theme::glass()).show_separator_line(false).show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                if ui.button("Add Instance").clicked() {
-                    self.open_new_instance(ctx);
-                }
-                if ui.button("Accounts").clicked() {
-                    self.windows.accounts_open = true;
-                }
-                if ui.button("Settings").clicked() {
+    /// Title, subtitle and the main actions on the left; the navigation on the right.
+    fn header(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        ui.horizontal_top(|ui| {
+            ui.vertical(|ui| {
+                ui.spacing_mut().item_spacing.y = 2.0;
+                ui.label(theme::title("Instances"));
+                let account = self.accounts.default_account().map(Account::profile_name).unwrap_or("No default account");
+                let count = match self.rows.len() {
+                    1 => "1 instance".to_string(),
+                    n => format!("{n} instances"),
+                };
+                ui.label(theme::subtitle(format!("{count}  ·  {account}")));
+            });
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                ui.spacing_mut().item_spacing.x = 22.0;
+                let page = self.windows.page();
+                if theme::nav(ui, "Settings", page == Some("Settings"), true).clicked() {
                     self.open_settings();
                 }
-                if ui.button("Reload").clicked() {
-                    self.reload();
+                let selected = self.selected.clone();
+                if theme::nav(ui, "Mods", page == Some("Mods"), selected.is_some()).clicked() {
+                    if let Some(id) = selected {
+                        self.open_mods(&id);
+                    }
                 }
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let account = self.accounts.default_account().map(Account::profile_name).unwrap_or("No default account");
-                    ui.label(account);
-                });
+                if theme::nav(ui, "Accounts", page == Some("Accounts"), true).clicked() {
+                    self.windows.accounts_open = true;
+                }
+                if theme::nav(ui, "Instances", page.is_none(), true).clicked() {
+                    self.windows.close_pages();
+                }
             });
         });
-        egui::TopBottomPanel::bottom("status").frame(theme::glass().inner_margin(egui::Margin::symmetric(12, 6))).show_separator_line(false).show(ctx, |ui| {
-            ui.label(if self.status.is_empty() { self.data_dir.display().to_string() } else { self.status.clone() });
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            if ui.button("Add Instance").clicked() {
+                self.open_new_instance(ctx);
+            }
+            if ui.button("Reload").clicked() {
+                self.reload();
+            }
+        });
+        ui.add_space(8.0);
+    }
+
+    /// The selected instance: what it is, its actions, and the icon row at the bottom right.
+    fn details(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        ui.set_min_size(ui.available_size());
+        let Some(id) = self.selected.clone() else {
+            ui.label(theme::caption("Select an instance."));
+            return;
+        };
+        let Some(row) = self.row(&id) else { return };
+        let (name, root, minecraft, loader) = (row.instance.name(), row.instance.root.clone(), row.minecraft.clone(), row.loader);
+        let is_running = self.running.get(&id).is_some_and(|r| !r.finished);
+        // The icon row first, as a bottom panel, so a short tile can never stack it on the buttons.
+        let icons = egui::TopBottomPanel::bottom("detail icons").frame(egui::Frame::NONE).show_separator_line(false);
+        icons.show_inside(ui, |ui| {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.spacing_mut().item_spacing.x = 8.0;
+                if theme::icon_button(ui, "▶", "Launch", true, !is_running).clicked() {
+                    self.launch(ctx, &id, None, None, None);
+                }
+                if theme::icon_button(ui, "🗁", "Folder", false, true).clicked() {
+                    open_folder(&root, &mut self.status);
+                }
+                if theme::icon_button(ui, "🖹", "Log", false, self.running.contains_key(&id)).clicked() {
+                    self.windows.log = Some(id.clone());
+                }
+                if theme::icon_button(ui, "⚙", "Edit", false, true).clicked() {
+                    self.open_edit(&id);
+                }
+            });
+        });
+        egui::CentralPanel::default().frame(egui::Frame::NONE).show_inside(ui, |ui| {
+            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| self.detail_actions(ui, ctx, &id, &name, &minecraft, loader, is_running));
         });
     }
 
-    fn actions(&mut self, ctx: &egui::Context) {
-        // The glass frame is drawn inside the panel: a side panel clips a frame's outer margin.
-        let panel = egui::SidePanel::right("actions").exact_width(214.0).frame(egui::Frame::NONE).show_separator_line(false);
-        panel.show(ctx, |ui| theme::glass().show(ui, |ui| {
-            ui.set_min_size(ui.available_size());
-            let Some(id) = self.selected.clone() else {
-                ui.label("Select an instance.");
-                return;
-            };
-            let Some(row) = self.row(&id) else { return };
-            let (name, root) = (row.instance.name(), row.instance.root.clone());
-            let loader = row.loader.map(|l| format!(" + {}", l.name())).unwrap_or_default();
-            ui.heading(&name);
-            ui.label(format!("Minecraft {}{loader}", row.minecraft));
-            ui.separator();
-            let is_running = self.running.get(&id).is_some_and(|r| !r.finished);
-            let wide = |ui: &mut egui::Ui, enabled: bool, text: &str| {
-                ui.add_enabled(enabled, egui::Button::new(text).min_size(egui::vec2(170.0, 0.0))).clicked()
-            };
-            let launch = egui::Button::new(egui::RichText::new("Launch").strong().color(theme::ON_ACCENT)).fill(theme::ACCENT).min_size(egui::vec2(170.0, 34.0));
-            if ui.add_enabled(!is_running, launch).clicked() {
-                self.launch(ctx, &id, None, None, None);
+    /// Name, version, badges and the wide action buttons of the selected instance.
+    #[allow(clippy::too_many_arguments)]
+    fn detail_actions(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, id: &str, name: &str, minecraft: &str, loader: Option<Loader>, is_running: bool) {
+        ui.add(egui::Label::new(egui::RichText::new(name).font(theme::semibold(19.0)).color(theme::TEXT_TITLE)).wrap());
+        ui.label(theme::subtitle(format!("Minecraft {minecraft}")));
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing.x = 6.0;
+            theme::badge(ui, minecraft);
+            if let Some(loader) = loader {
+                theme::badge(ui, loader.name());
             }
-            if wide(ui, !is_running, "Launch Offline") {
-                let name = self.accounts.default_account().map(|a| a.profile_name().to_string());
-                self.launch(ctx, &id, None, name.or(Some("Player".into())), None);
+            if is_running {
+                theme::badge(ui, "Running");
             }
-            if wide(ui, is_running, "Kill") {
-                if let Some(running) = self.running.get_mut(&id) {
-                    running.kill();
-                }
+        });
+        ui.add_space(10.0);
+        let wide = |ui: &mut egui::Ui, enabled: bool, text: &str| {
+            ui.add_enabled(enabled, egui::Button::new(text).min_size(egui::vec2(ui.available_width(), 30.0))).clicked()
+        };
+        if wide(ui, !is_running, "Launch Offline") {
+            let name = self.accounts.default_account().map(|a| a.profile_name().to_string());
+            self.launch(ctx, id, None, name.or(Some("Player".into())), None);
+        }
+        if wide(ui, is_running, "Kill") {
+            if let Some(running) = self.running.get_mut(id) {
+                running.kill();
             }
-            if wide(ui, self.running.contains_key(&id), "Log") {
-                self.windows.log = Some(id.clone());
-            }
-            ui.separator();
-            if wide(ui, true, "Edit") {
-                self.open_edit(&id);
-            }
-            if wide(ui, true, "Mods") {
-                self.open_mods(&id);
-            }
-            if wide(ui, true, "Folder") {
-                open_folder(&root, &mut self.status);
-            }
-            if wide(ui, !is_running, "Delete") {
-                self.windows.confirm_delete = Some(id.clone());
-            }
-        }));
+        }
+        if wide(ui, !is_running, "Delete") {
+            self.windows.confirm_delete = Some(id.to_string());
+        }
     }
 
-    fn instance_list(&mut self, ctx: &egui::Context) {
-        egui::CentralPanel::default().frame(theme::glass()).show(ctx, |ui| {
-            if self.rows.is_empty() {
-                ui.label("No instances yet. Use \"Add Instance\" to create one.");
-                return;
-            }
-            let mut groups: BTreeMap<&str, Vec<&Row>> = BTreeMap::new();
-            for row in &self.rows {
-                groups.entry(row.group.as_str()).or_default().push(row);
-            }
-            let mut clicked = None;
-            let mut double_clicked = None;
-            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-                for (group, rows) in groups {
-                    let title = if group.is_empty() { "Ungrouped" } else { group };
-                    egui::CollapsingHeader::new(title).default_open(true).show(ui, |ui| {
+    /// The instances as glass tiles, by group.
+    fn instance_list(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        if self.rows.is_empty() {
+            ui.label(theme::caption("No instances yet. Use \"Add Instance\" to create one."));
+            return;
+        }
+        let mut groups: BTreeMap<&str, Vec<&Row>> = BTreeMap::new();
+        for row in &self.rows {
+            groups.entry(row.group.as_str()).or_default().push(row);
+        }
+        let mut clicked = None;
+        let mut double_clicked = None;
+        egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+            for (group, rows) in groups {
+                let title = if group.is_empty() { "Ungrouped" } else { group };
+                let header = egui::RichText::new(title.to_uppercase()).size(11.0).color(theme::TEXT_DIM);
+                egui::CollapsingHeader::new(header).id_salt(title).default_open(true).show(ui, |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.spacing_mut().item_spacing = egui::vec2(12.0, 12.0);
                         for row in rows {
                             let id = &row.instance.id;
-                            let loader = row.loader.map(|l| format!(", {}", l.name())).unwrap_or_default();
-                            let state = if self.running.get(id).is_some_and(|r| !r.finished) { "  (running)" } else { "" };
-                            let text = format!("{}   [{}{loader}]{state}", row.instance.name(), row.minecraft);
-                            let response = ui.selectable_label(self.selected.as_ref() == Some(id), text);
+                            let running = self.running.get(id).is_some_and(|r| !r.finished);
+                            let response = instance_card(ui, row, self.selected.as_ref() == Some(id), running);
                             if response.clicked() {
                                 clicked = Some(id.clone());
                             }
@@ -420,16 +459,52 @@ impl App {
                             }
                         }
                     });
-                }
-            });
-            if let Some(id) = clicked {
-                self.selected = Some(id);
-            }
-            if let Some(id) = double_clicked {
-                self.launch(ctx, &id, None, None, None);
+                });
             }
         });
+        if let Some(id) = clicked {
+            self.selected = Some(id);
+        }
+        if let Some(id) = double_clicked {
+            self.launch(ctx, &id, None, None, None);
+        }
     }
+}
+
+/// One instance as a small glass tile: name, version badges, a glow when selected.
+fn instance_card(ui: &mut egui::Ui, row: &Row, selected: bool, running: bool) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(196.0, 84.0), egui::Sense::click());
+    let loader = row.loader.map(|l| format!(", {}", l.name())).unwrap_or_default();
+    let state = if running { "  (running)" } else { "" };
+    // What screen readers (and the tests) read: the same text the plain list used to show.
+    let label = format!("{}   [{}{loader}]{state}", row.instance.name(), row.minecraft);
+    response.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, selected, &label));
+    if !ui.is_rect_visible(rect) {
+        return response;
+    }
+    let hot = response.hovered();
+    let painter = ui.painter();
+    let radius = egui::CornerRadius::same(16);
+    if selected {
+        painter.add(egui::Shadow { offset: [0, 0], blur: 20, spread: 0, color: theme::white(34) }.as_shape(rect, radius));
+    }
+    let (fill, edge) = match (selected, hot) {
+        (true, _) => (16, 150),
+        (false, true) => (11, 80),
+        _ => (5, 34),
+    };
+    painter.rect(rect, radius, theme::white(fill), egui::Stroke::new(1.0_f32, theme::white(edge)), egui::StrokeKind::Inside);
+    let mut job = egui::text::LayoutJob::simple_singleline(row.instance.name(), theme::semibold(14.0), theme::TEXT);
+    job.wrap = egui::text::TextWrapping::truncate_at_width(rect.width() - 28.0);
+    let name = ui.fonts(|fonts| fonts.layout_job(job));
+    painter.galley(rect.min + egui::vec2(14.0, 14.0), name, theme::TEXT);
+    let mut x = rect.left() + 14.0;
+    let y = rect.bottom() - 26.0;
+    let badges = [Some(row.minecraft.as_str()), row.loader.map(|l| l.name()), running.then_some("Running")];
+    for text in badges.into_iter().flatten().filter(|t| !t.is_empty()) {
+        x += theme::paint_badge(ui, egui::pos2(x, y), text) + 6.0;
+    }
+    response
 }
 
 /// Opens a folder in the system's file manager.
@@ -447,11 +522,12 @@ pub fn open_folder(path: &std::path::Path, status: &mut String) {
 }
 
 impl eframe::App for App {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        self.glass.window(ctx, frame);
         self.ui(ctx);
     }
 
-    /// Nothing behind the UI, so the desktop shows through the translucent background.
+    /// Nothing behind the glass, so the desktop shows through it and the corners are clear.
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
         [0.0; 4]
     }
@@ -461,9 +537,11 @@ impl App {
     /// One frame. Separate from `eframe::App::update` so tests can drive it without a window.
     pub fn ui(&mut self, ctx: &egui::Context) {
         if !std::mem::replace(&mut self.themed, true) {
+            // New fonts are bound from the next pass on; egui runs that pass right away.
             theme::apply(ctx);
+            ctx.request_discard("fonts");
+            return;
         }
-        theme::paint_background(ctx);
         while let Ok(msg) = self.rx.try_recv() {
             self.handle(msg, ctx);
         }
@@ -476,9 +554,24 @@ impl App {
                 self.launch(ctx, &id, cli.profile.as_deref(), cli.offline, target);
             }
         }
-        self.top_bar(ctx);
-        self.actions(ctx);
-        self.instance_list(ctx);
+        let panel = ctx.screen_rect();
+        self.glass.paint(ctx, panel);
+        egui::CentralPanel::default().frame(egui::Frame::NONE).show(ctx, |ui| {
+            glass::title_bar(ui, panel, self.windows.page().unwrap_or("Instances"));
+            ui.scope_builder(egui::UiBuilder::new().max_rect(glass::content_rect(panel)), |ui| {
+                self.header(ui, ctx);
+                egui::TopBottomPanel::bottom("status").frame(egui::Frame::NONE.inner_margin(egui::Margin { top: 8, ..Default::default() })).show_separator_line(false).show_inside(ui, |ui| {
+                    ui.label(theme::caption(if self.status.is_empty() { self.data_dir.display().to_string() } else { self.status.clone() }));
+                });
+                let side = egui::SidePanel::right("actions").exact_width(238.0).resizable(false).show_separator_line(false);
+                side.frame(egui::Frame::NONE.inner_margin(egui::Margin { left: 14, ..Default::default() })).show_inside(ui, |ui| {
+                    theme::tile().show(ui, |ui| self.details(ui, ctx));
+                });
+                egui::CentralPanel::default().frame(egui::Frame::NONE).show_inside(ui, |ui| self.instance_list(ui, ctx));
+            });
+        });
         self.show_windows(ctx);
+        glass::resize_edges(ctx, panel);
     }
+
 }
