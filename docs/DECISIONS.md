@@ -108,3 +108,11 @@ The UI code runs in `App::ui`, which needs no window. The tests in
 through egui's accessibility tree and click them. This is why the `accesskit` feature
 of eframe is enabled. A real window only repaints while it is visible, so scripted clicks
 on the window itself were not reliable.
+
+## The one `unsafe` block
+
+`crates/app/src/acrylic.rs` calls `SetWindowCompositionAttribute` from user32 to blur
+what is behind the window. It is undocumented, so it needs raw FFI. The documented
+ways were tried first and are opaque on Windows 11: the system backdrop goes solid when
+the window is inactive, and the plain blur accent renders as a dark layer. If the call
+is missing, the window stays see-through without blur.

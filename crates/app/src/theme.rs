@@ -8,7 +8,7 @@ pub const ACCENT: Color32 = Color32::from_rgb(232, 232, 236);
 pub const ON_ACCENT: Color32 = Color32::from_rgb(24, 24, 27);
 
 /// How much of the smoke tint covers the blurred desktop (0 = clear, 255 = solid).
-const BACKDROP: u8 = 90;
+const BACKDROP: u8 = 40;
 
 const TEXT: Color32 = Color32::from_rgb(226, 226, 230);
 const TEXT_DIM: Color32 = Color32::from_rgb(160, 160, 168);

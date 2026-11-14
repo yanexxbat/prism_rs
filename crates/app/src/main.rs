@@ -1,6 +1,8 @@
 //! prism_rs: a Rust port of Prism Launcher. See NOTICE.md.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(windows)]
+mod acrylic;
 mod app;
 #[cfg(test)]
 mod gui_tests;
@@ -91,11 +93,10 @@ fn main() -> std::process::ExitCode {
             ..Default::default()
         };
         eframe::run_native("prism_rs", options, Box::new(move |_creation| {
-            // Blurs the desktop behind the window. Not `apply_acrylic`: on Windows 11 that sets the
-            // system backdrop, an almost opaque material that turns solid when the window is inactive.
+            // Without the blur the window is still see-through, only sharp.
             #[cfg(windows)]
-            if let Err(e) = window_vibrancy::apply_blur(_creation, None) {
-                tracing::warn!("no blur behind the window: {e}");
+            if !acrylic::enable(_creation, [28, 28, 31, 96]) {
+                tracing::warn!("no blur behind the window");
             }
             Ok(Box::new(state))
         })).map_err(|e| e.to_string())
