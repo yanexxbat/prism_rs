@@ -2,3 +2,6 @@
 /_original
 /_testdata
 /_testdata*
+/crates/app/tests/snapshots/*.new.png
+/crates/app/tests/snapshots/*.diff.png
+/crates/app/tests/snapshots/*.old.png

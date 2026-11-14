@@ -22,7 +22,7 @@ name = "prism_rs"
 path = "src/main.rs"
 
 [dev-dependencies]
-egui_kittest = "0.31"
+egui_kittest = { version = "0.31", features = ["snapshot", "wgpu"] }
 tempfile.workspace = true
 
 [target.'cfg(windows)'.dependencies]
