@@ -32,7 +32,7 @@ ships as a single `.exe`.
 - **Mods:** search, install and manage mods from Modrinth and CurseForge
 - **Compatible:** works on Prism Launcher instance folders (`--dir`)
 - **Command line:** launch an instance directly and join a server or world
-- **Look:** a see-through frosted-glass window over the desktop, a Mac-style title bar
+- **Look:** a see-through frosted-glass window over the desktop, Windows-style caption buttons
   and the Poppins font (see [docs/DECISIONS.md](docs/DECISIONS.md#the-glass-look))
 
 ## Download

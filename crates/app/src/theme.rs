@@ -27,8 +27,9 @@ pub const TEXT_TITLE: Color32 = Color32::from_rgb(226, 226, 231);
 /// Small captions, idle navigation, hints. The darkest text; `glass::tests` checks its contrast.
 pub const TEXT_DIM: Color32 = Color32::from_rgb(225, 225, 230);
 
-/// Close, minimise, maximise. The only colour in the window, as on a Mac.
-pub const TRAFFIC_LIGHTS: [Color32; 3] = [Color32::from_rgb(255, 95, 87), Color32::from_rgb(254, 188, 46), Color32::from_rgb(40, 200, 64)];
+/// The close button on hover and while pressed, as on Windows. The only colour in the window.
+pub const CLOSE_HOVER: Color32 = Color32::from_rgb(196, 43, 28);
+pub const CLOSE_PRESSED: Color32 = Color32::from_rgb(160, 36, 24);
 
 /// White at the given opacity (premultiplied, so all four channels are equal).
 pub const fn white(alpha: u8) -> Color32 {

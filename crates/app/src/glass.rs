@@ -1,6 +1,6 @@
 //! The window as a pane of frosted glass: the desktop shows through, blurred by Windows'
 //! acrylic backdrop, under a smoky tint, a soft sheen and a light edge.
-//! There is no system frame, so the Mac-style title bar and the edge resizing live here.
+//! There is no system frame, so the title bar with its caption buttons and the edge resizing live here.
 
 use crate::theme::{self, white};
 use eframe::egui::{self, pos2, vec2, Color32, CornerRadius, Rect, Stroke, Vec2};
@@ -108,8 +108,8 @@ fn sheen(panel: Rect, radius: f32) -> egui::Mesh {
     mesh
 }
 
-/// The Mac-style title bar across the top of `panel`: traffic lights on the left, the page
-/// name in an address field in the middle, a hairline below. Dragging it moves the window.
+/// The title bar across the top of `panel`: the page name in an address field in the middle,
+/// the Windows caption buttons on the right, a hairline below. Dragging it moves the window.
 pub fn title_bar(ui: &mut egui::Ui, panel: Rect, page: &str) {
     let rect = Rect::from_min_size(panel.min, vec2(panel.width(), TITLE_BAR));
     let ctx = ui.ctx().clone();
@@ -122,26 +122,27 @@ pub fn title_bar(ui: &mut egui::Ui, panel: Rect, page: &str) {
         ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(!maximized));
     }
     let painter = ui.painter_at(rect);
-    let lights = Rect::from_min_size(rect.min + vec2(14.0, 10.0), vec2(64.0, 20.0));
-    let show_symbols = ui.rect_contains_pointer(lights);
-    let commands = [
-        ("Close window", egui::ViewportCommand::Close),
-        ("Minimize", egui::ViewportCommand::Minimized(true)),
-        ("Maximize", egui::ViewportCommand::Maximized(!maximized)),
+    // Windows-style caption buttons at the right: minimise, maximise or restore, close.
+    // Kept clear of the rounded corner, which the window clip cuts away.
+    let size = vec2(44.0, 28.0);
+    let close = Rect::from_min_size(pos2(rect.right() - 12.0 - size.x, rect.top() + 6.0), size);
+    let buttons = [
+        (Glyph::Close, "Close window", egui::ViewportCommand::Close, close),
+        (if maximized { Glyph::Restore } else { Glyph::Maximize }, if maximized { "Restore" } else { "Maximize" }, egui::ViewportCommand::Maximized(!maximized), close.translate(vec2(-size.x, 0.0))),
+        (Glyph::Minimize, "Minimize", egui::ViewportCommand::Minimized(true), close.translate(vec2(-2.0 * size.x, 0.0))),
     ];
-    for (i, ((name, command), color)) in commands.into_iter().zip(theme::TRAFFIC_LIGHTS).enumerate() {
-        let center = pos2(rect.left() + 24.0 + 20.0 * i as f32, rect.center().y);
-        let response = ui.interact(Rect::from_center_size(center, Vec2::splat(16.0)), egui::Id::new(name), egui::Sense::click());
+    for (glyph, name, command, button) in buttons {
+        let response = ui.interact(button, egui::Id::new(("caption button", name)), egui::Sense::click());
         response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, name));
-        let ring = Color32::from_rgb((color.r() as f32 * 0.78) as u8, (color.g() as f32 * 0.78) as u8, (color.b() as f32 * 0.78) as u8);
-        painter.circle(center, 6.5, color, Stroke::new(0.8_f32, ring));
-        // A glossy highlight: a soft cap and a small bright point near the top.
-        painter.circle_filled(center + vec2(0.0, -2.2), 3.6, white(50));
-        painter.circle_filled(center + vec2(-1.4, -2.6), 1.5, white(170));
-        if show_symbols {
-            let symbol = ["×", "−", "+"][i];
-            painter.text(center, egui::Align2::CENTER_CENTER, symbol, egui::FontId::proportional(10.0), Color32::from_black_alpha(150));
-        }
+        let (fill, stroke) = match (glyph, response.is_pointer_button_down_on(), response.hovered()) {
+            (Glyph::Close, true, _) => (theme::CLOSE_PRESSED, Color32::WHITE),
+            (Glyph::Close, _, true) => (theme::CLOSE_HOVER, Color32::WHITE),
+            (_, true, _) => (white(30), Color32::WHITE),
+            (_, _, true) => (white(18), Color32::WHITE),
+            _ => (Color32::TRANSPARENT, theme::TEXT),
+        };
+        painter.rect_filled(button, CornerRadius::same(6), fill);
+        paint_glyph(&painter, glyph, button.center(), Stroke::new(1.0_f32, stroke));
         if response.clicked() {
             ctx.send_viewport_cmd(command);
         }
@@ -151,6 +152,38 @@ pub fn title_bar(ui: &mut egui::Ui, panel: Rect, page: &str) {
     let galley = painter.layout(page.to_string(), egui::FontId::proportional(12.0), theme::TEXT_DIM, field.width() - 24.0);
     painter.galley(field.center() - galley.size() / 2.0, galley, theme::TEXT_DIM);
     painter.hline(rect.x_range(), rect.bottom() - 0.5, Stroke::new(1.0_f32, white(24)));
+}
+
+#[derive(Clone, Copy)]
+enum Glyph {
+    Minimize,
+    Maximize,
+    Restore,
+    Close,
+}
+
+/// The caption glyphs as thin 10 px lines, like Windows draws them.
+fn paint_glyph(painter: &egui::Painter, glyph: Glyph, center: egui::Pos2, stroke: Stroke) {
+    let half = 5.0;
+    match glyph {
+        Glyph::Minimize => {
+            painter.hline(center.x - half..=center.x + half, center.y, stroke);
+        }
+        Glyph::Maximize => {
+            painter.rect_stroke(Rect::from_center_size(center, Vec2::splat(2.0 * half)), CornerRadius::same(1), stroke, egui::StrokeKind::Inside);
+        }
+        Glyph::Restore => {
+            let front = Rect::from_min_size(center + vec2(-half, -half + 2.0), Vec2::splat(2.0 * half - 2.0));
+            painter.rect_stroke(front, CornerRadius::same(1), stroke, egui::StrokeKind::Inside);
+            // The window behind: only its top and right edge show.
+            let (left, top, right, bottom) = (front.left() + 2.0, front.top() - 2.0, front.right() + 2.0, front.bottom() - 2.0);
+            painter.line(vec![pos2(left, front.top()), pos2(left, top), pos2(right, top), pos2(right, bottom), pos2(front.right(), bottom)], stroke);
+        }
+        Glyph::Close => {
+            painter.line_segment([center + vec2(-half, -half), center + vec2(half, half)], stroke);
+            painter.line_segment([center + vec2(-half, half), center + vec2(half, -half)], stroke);
+        }
+    }
 }
 
 /// The space under the title bar, for the page.
