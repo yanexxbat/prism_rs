@@ -83,12 +83,14 @@ fn scene(panel: Rect, shift: Vec2) -> Scene {
 /// The blurred backdrop, from the GPU when there is a glow context, else from the CPU.
 enum Blurred {
     Gpu { blur: Arc<Mutex<blur::GlBlur>>, texture: Option<egui::TextureId> },
-    Cpu { small: Vec<blur::Small>, texture: Option<egui::TextureHandle> },
+    Cpu { texture: Option<egui::TextureHandle> },
 }
 
 #[derive(Default)]
 pub struct Glass {
     images: Vec<image::RgbaImage>,
+    /// The sprites shrunk to blur texels, for both blurs.
+    small: Vec<blur::Small>,
     sprites: Vec<egui::TextureHandle>,
     grain: Option<egui::TextureHandle>,
     blurred: Option<Blurred>,
@@ -103,6 +105,14 @@ fn decode(sprite: &Sprite) -> image::RgbaImage {
 }
 
 impl Glass {
+    fn small(&mut self) -> &[blur::Small] {
+        if self.small.is_empty() {
+            let small = self.images().iter().zip(&SPRITES).map(|(image, sprite)| blur::Small::new(image, sprite.diameter)).collect();
+            self.small = small;
+        }
+        &self.small
+    }
+
     fn images(&mut self) -> &[image::RgbaImage] {
         if self.images.is_empty() {
             self.images = SPRITES.iter().map(decode).collect();
@@ -113,7 +123,7 @@ impl Glass {
     /// Sets up the GPU blur. Without it (or if it fails) the CPU blur is used.
     pub fn init_gl(&mut self, gl: Option<&eframe::glow::Context>) {
         let Some(gl) = gl else { return };
-        match blur::GlBlur::new(gl, self.images()) {
+        match blur::GlBlur::new(gl, self.small()) {
             Ok(blur) => self.blurred = Some(Blurred::Gpu { blur: Arc::new(Mutex::new(blur)), texture: None }),
             Err(e) => tracing::warn!("no GPU blur, using the CPU blur: {e}"),
         }
@@ -125,6 +135,9 @@ impl Glass {
         if let Some(Blurred::Gpu { blur, texture: texture @ None }) = &mut self.blurred {
             let output = blur.lock().expect("blur lock").output;
             *texture = Some(frame.register_native_glow_texture(output));
+        }
+        if ctx.input(|i| i.viewport().minimized == Some(true)) {
+            return; // a minimised window reports itself as not maximised; keep the clip as it was
         }
         #[cfg(windows)]
         {
@@ -178,7 +191,9 @@ impl Glass {
             theme::GLASS_TINT_ACRYLIC
         } else {
             // The sharp chrome first: the opaque blurred panel then covers it except where it sticks out.
-            let shift = self.parallax(ctx, panel);
+            // No parallax on the CPU blur: it would re-blur on every frame of the easing.
+            let gpu = matches!(self.blurred, Some(Blurred::Gpu { .. }));
+            let shift = if gpu { self.parallax(ctx, panel) } else { Vec2::ZERO };
             for (index, rect) in sprite_rects(panel, shift) {
                 let uv = Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0));
                 painter.image(self.sprites[index].id(), rect, uv, Color32::WHITE);
@@ -223,25 +238,28 @@ impl Glass {
             }
         }
         if self.blurred.is_none() {
-            let small = self.images().iter().zip(&SPRITES).map(|(image, sprite)| blur::Small::new(image, sprite.diameter)).collect();
-            self.blurred = Some(Blurred::Cpu { small, texture: None });
+            self.small();
+            self.blurred = Some(Blurred::Cpu { texture: None });
         }
         match self.blurred.as_mut().expect("set above") {
             Blurred::Gpu { blur, texture } => {
                 if blur.lock().expect("blur lock").rendered.as_ref() != Some(scene) {
-                    let (blur, scene) = (blur.clone(), scene.clone());
+                    let (blur, scene, repaint) = (blur.clone(), scene.clone(), ctx.clone());
                     let callback = eframe::egui_glow::CallbackFn::new(move |_info, painter| {
                         let mut blur = blur.lock().expect("blur lock");
                         blur.render(painter.gl(), &scene, theme::BACKDROP_CENTER, theme::BACKDROP_EDGE);
+                        if blur.failed {
+                            repaint.request_repaint(); // so the CPU blur takes over at once
+                        }
                     });
                     painter.add(egui::PaintCallback { rect: ctx.screen_rect(), callback: Arc::new(callback) });
                 }
                 // Registered in `window`, which runs before the first paint.
                 texture.expect("GPU blur texture registered")
             }
-            Blurred::Cpu { small, texture } => {
+            Blurred::Cpu { texture } => {
                 if self.shown.as_ref() != Some(scene) || texture.is_none() {
-                    let image = blur::cpu_blur(scene, small, theme::BACKDROP_CENTER, theme::BACKDROP_EDGE);
+                    let image = blur::cpu_blur(scene, &self.small, theme::BACKDROP_CENTER, theme::BACKDROP_EDGE);
                     match texture {
                         Some(handle) => handle.set(image, egui::TextureOptions::LINEAR),
                         None => *texture = Some(ctx.load_texture("glass blur", image, egui::TextureOptions::LINEAR)),
@@ -340,7 +358,8 @@ pub fn resize_edges(ctx: &egui::Context, panel: Rect) {
     let Some(pos) = ctx.input(|i| i.pointer.hover_pos()) else { return };
     const GRIP: f32 = 6.0;
     const CORNER: f32 = 22.0;
-    if !panel.expand(GRIP).contains(pos) {
+    // Only inside the panel: outside it the window is clipped away and gets no input.
+    if !panel.contains(pos) {
         return;
     }
     let (left, right) = (pos.x - panel.left(), panel.right() - pos.x);
@@ -427,6 +446,15 @@ mod tests {
                 let ratio = theme::contrast(text, background);
                 assert!(ratio >= 4.5, "{name} on {glass} {background:?}: {ratio:.2}");
             }
+        }
+        // Dialogs: body and weak text (`ui.weak`) on the dialog fill over the brightest glass.
+        let ctx = egui::Context::default();
+        theme::apply(&ctx);
+        let visuals = ctx.style().visuals.clone();
+        let dialog = over(brightest, visuals.window_fill);
+        for (name, text) in [("dialog text", visuals.text_color()), ("weak dialog text", visuals.weak_text_color())] {
+            let ratio = theme::contrast(text, dialog);
+            assert!(ratio >= 4.5, "{name} {text:?} on {dialog:?}: {ratio:.2}");
         }
         println!("brightest glass {brightest:?}, TEXT_DIM {:.2}:1", theme::contrast(theme::TEXT_DIM, brightest));
     }

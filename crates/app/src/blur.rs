@@ -198,8 +198,7 @@ void main() {
         float t = smoothstep(0.2, 1.3, length((v_uv - c) / half_size));
         f_color = vec4(mix(u_center, u_edge, t), 1.0);
     } else {
-        vec4 c = texture(u_tex, v_uv);
-        f_color = vec4(c.rgb * c.a, c.a);
+        f_color = texture(u_tex, v_uv); // already linear and premultiplied
     }
 }
 "#;
@@ -250,7 +249,7 @@ pub struct GlBlur {
 // renders with, made while it is current (at creation and inside egui's paint callback),
 // on objects this struct created.
 impl GlBlur {
-    pub fn new(gl: &glow::Context, sprites: &[image::RgbaImage]) -> Result<Self, String> {
+    pub fn new(gl: &glow::Context, sprites: &[Small]) -> Result<Self, String> {
         let version = egui_glow_version(gl)?;
         let srgb = version.contains("es") || gl.supported_extensions().iter().any(|e| e.contains("sRGB"));
         if !srgb {
@@ -262,15 +261,16 @@ impl GlBlur {
             let vao = gl.create_vertex_array()?;
             let fbo = gl.create_framebuffer()?;
             let mut textures = Vec::new();
-            for image in sprites {
+            // The same shrunk, premultiplied texels the CPU blur samples, so both paths match.
+            for small in sprites {
                 let texture = gl.create_texture()?;
                 gl.bind_texture(glow::TEXTURE_2D, Some(texture));
-                gl.pixel_store_i32(glow::UNPACK_ALIGNMENT, 1);
-                let (w, h) = (image.width() as i32, image.height() as i32);
-                let data = glow::PixelUnpackData::Slice(Some(image.as_raw()));
-                gl.tex_image_2d(glow::TEXTURE_2D, 0, glow::SRGB8_ALPHA8 as i32, w, h, 0, glow::RGBA, glow::UNSIGNED_BYTE, data);
-                gl.generate_mipmap(glow::TEXTURE_2D);
-                sampler(gl, glow::LINEAR_MIPMAP_LINEAR);
+                gl.pixel_store_i32(glow::UNPACK_ALIGNMENT, 4);
+                let side = small.side as i32;
+                let bytes: Vec<u8> = small.texels.iter().flatten().flat_map(|v| v.to_ne_bytes()).collect();
+                let data = glow::PixelUnpackData::Slice(Some(&bytes));
+                gl.tex_image_2d(glow::TEXTURE_2D, 0, glow::RGBA32F as i32, side, side, 0, glow::RGBA, glow::FLOAT, data);
+                sampler(gl, glow::LINEAR);
                 textures.push(texture);
             }
             let [ping, pong, output] = [gl.create_texture()?, gl.create_texture()?, gl.create_texture()?];

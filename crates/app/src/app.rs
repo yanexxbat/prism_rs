@@ -374,36 +374,10 @@ impl App {
         let Some(row) = self.row(&id) else { return };
         let (name, root, minecraft, loader) = (row.instance.name(), row.instance.root.clone(), row.minecraft.clone(), row.loader);
         let is_running = self.running.get(&id).is_some_and(|r| !r.finished);
-        ui.add(egui::Label::new(egui::RichText::new(&name).font(theme::semibold(19.0)).color(theme::TEXT_TITLE)).wrap());
-        ui.label(theme::subtitle(format!("Minecraft {minecraft}")));
-        ui.horizontal_wrapped(|ui| {
-            ui.spacing_mut().item_spacing.x = 6.0;
-            theme::badge(ui, &minecraft);
-            if let Some(loader) = loader {
-                theme::badge(ui, loader.name());
-            }
-            if is_running {
-                theme::badge(ui, "Running");
-            }
-        });
-        ui.add_space(10.0);
-        let wide = |ui: &mut egui::Ui, enabled: bool, text: &str| {
-            ui.add_enabled(enabled, egui::Button::new(text).min_size(egui::vec2(ui.available_width(), 30.0))).clicked()
-        };
-        if wide(ui, !is_running, "Launch Offline") {
-            let name = self.accounts.default_account().map(|a| a.profile_name().to_string());
-            self.launch(ctx, &id, None, name.or(Some("Player".into())), None);
-        }
-        if wide(ui, is_running, "Kill") {
-            if let Some(running) = self.running.get_mut(&id) {
-                running.kill();
-            }
-        }
-        if wide(ui, !is_running, "Delete") {
-            self.windows.confirm_delete = Some(id.clone());
-        }
-        ui.with_layout(egui::Layout::bottom_up(egui::Align::Max), |ui| {
-            ui.allocate_ui_with_layout(egui::vec2(ui.available_width(), 40.0), egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        // The icon row first, as a bottom panel, so a short tile can never stack it on the buttons.
+        let icons = egui::TopBottomPanel::bottom("detail icons").frame(egui::Frame::NONE).show_separator_line(false);
+        icons.show_inside(ui, |ui| {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
                 if theme::icon_button(ui, "▶", "Launch", true, !is_running).clicked() {
                     self.launch(ctx, &id, None, None, None);
@@ -419,6 +393,42 @@ impl App {
                 }
             });
         });
+        egui::CentralPanel::default().frame(egui::Frame::NONE).show_inside(ui, |ui| {
+            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| self.detail_actions(ui, ctx, &id, &name, &minecraft, loader, is_running));
+        });
+    }
+
+    /// Name, version, badges and the wide action buttons of the selected instance.
+    #[allow(clippy::too_many_arguments)]
+    fn detail_actions(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, id: &str, name: &str, minecraft: &str, loader: Option<Loader>, is_running: bool) {
+        ui.add(egui::Label::new(egui::RichText::new(name).font(theme::semibold(19.0)).color(theme::TEXT_TITLE)).wrap());
+        ui.label(theme::subtitle(format!("Minecraft {minecraft}")));
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing.x = 6.0;
+            theme::badge(ui, minecraft);
+            if let Some(loader) = loader {
+                theme::badge(ui, loader.name());
+            }
+            if is_running {
+                theme::badge(ui, "Running");
+            }
+        });
+        ui.add_space(10.0);
+        let wide = |ui: &mut egui::Ui, enabled: bool, text: &str| {
+            ui.add_enabled(enabled, egui::Button::new(text).min_size(egui::vec2(ui.available_width(), 30.0))).clicked()
+        };
+        if wide(ui, !is_running, "Launch Offline") {
+            let name = self.accounts.default_account().map(|a| a.profile_name().to_string());
+            self.launch(ctx, id, None, name.or(Some("Player".into())), None);
+        }
+        if wide(ui, is_running, "Kill") {
+            if let Some(running) = self.running.get_mut(id) {
+                running.kill();
+            }
+        }
+        if wide(ui, !is_running, "Delete") {
+            self.windows.confirm_delete = Some(id.to_string());
+        }
     }
 
     /// The instances as glass tiles, by group.
@@ -517,7 +527,6 @@ pub fn open_folder(path: &std::path::Path, status: &mut String) {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         self.glass.window(ctx, frame, self.acrylic());
-        if std::env::var_os("PRISM_RS_DEBUG_REPAINT").is_some() { eprintln!("frame {} causes {:?} screen {:?} vp {:?} hover {:?}", ctx.cumulative_pass_nr(), ctx.repaint_causes(), ctx.screen_rect(), ctx.input(|i| (i.viewport().focused, i.viewport().maximized, i.viewport().inner_rect)), ctx.input(|i| i.pointer.hover_pos())); } // TEMP
         self.ui(ctx);
     }
 
@@ -551,6 +560,10 @@ impl App {
         let panel = glass::panel_rect(ctx.screen_rect(), glass::maximized(ctx));
         self.panel = panel;
         self.glass.paint(ctx, panel, self.acrylic());
+        // From here on egui treats the panel as the screen, so dialogs, menus and tooltips stay
+        // on the glass: outside it the window is clipped away on Windows.
+        // The real size comes back at the end of the pass for painting.
+        let screen = ctx.input_mut(|i| std::mem::replace(&mut i.screen_rect, panel));
         egui::CentralPanel::default().frame(egui::Frame::NONE).show(ctx, |ui| {
             glass::title_bar(ui, panel, self.windows.page().unwrap_or("Instances"));
             ui.scope_builder(egui::UiBuilder::new().max_rect(glass::content_rect(panel)), |ui| {
@@ -567,6 +580,7 @@ impl App {
         });
         self.show_windows(ctx);
         glass::resize_edges(ctx, panel);
+        ctx.input_mut(|i| i.screen_rect = screen);
     }
 
     /// The Windows acrylic blur instead of the built-in glass (Settings, Appearance).

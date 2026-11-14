@@ -116,6 +116,8 @@ pub fn apply(ctx: &egui::Context) {
     }
     widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, white(26)); // separators
     widgets.noninteractive.fg_stroke = Stroke::new(1.0_f32, TEXT_DIM);
+    // egui greys out weak and disabled text half way towards this; lighter keeps it at 4.5:1 or more.
+    widgets.noninteractive.weak_bg_fill = Color32::from_gray(80);
     widgets.noninteractive.corner_radius = CornerRadius::same(10);
     ctx.set_style(style);
 }
