@@ -91,10 +91,11 @@ fn main() -> std::process::ExitCode {
             ..Default::default()
         };
         eframe::run_native("prism_rs", options, Box::new(move |_creation| {
-            // Blurs the desktop behind the window. Without it the window is still see-through.
+            // Blurs the desktop behind the window. Not `apply_acrylic`: on Windows 11 that sets the
+            // system backdrop, an almost opaque material that turns solid when the window is inactive.
             #[cfg(windows)]
-            if let Err(e) = window_vibrancy::apply_acrylic(_creation, Some((24, 24, 26, 110))) {
-                tracing::warn!("no acrylic blur: {e}");
+            if let Err(e) = window_vibrancy::apply_blur(_creation, None) {
+                tracing::warn!("no blur behind the window: {e}");
             }
             Ok(Box::new(state))
         })).map_err(|e| e.to_string())
