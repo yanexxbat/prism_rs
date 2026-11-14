@@ -1,173 +1,88 @@
+//! The look: smoked, frosted glass. Neutral greys, thin light edges, flat outlined controls.
+//! The blur comes from the window's acrylic backdrop (see `main.rs`); egui only adds the tint.
 
-//! Glassmorphism theme: translucent panels over a colourful gradient.
-//! Normal opaque Windows window, transparent egui panels.
+use eframe::egui::{self, Color32, CornerRadius, Frame, Margin, Shadow, Stroke};
 
-use eframe::egui::{
-    self, Color32, CornerRadius, Frame, Margin, Shadow, Stroke,
-};
+/// The one highlighted control (Launch): light on dark, like the rest of the type.
+pub const ACCENT: Color32 = Color32::from_rgb(232, 232, 236);
+pub const ON_ACCENT: Color32 = Color32::from_rgb(24, 24, 27);
 
-pub const ACCENT: Color32 = Color32::from_rgb(96, 148, 255);
-pub const ON_ACCENT: Color32 = Color32::WHITE;
+/// How much of the smoke tint covers the blurred desktop (0 = clear, 255 = solid).
+const BACKDROP: u8 = 150;
 
-const BACKDROP: u8 = 100;
-
-fn rgba(r: u8, g: u8, b: u8, a: u8) -> Color32 {
-    Color32::from_rgba_unmultiplied(r, g, b, a)
-}
+const TEXT: Color32 = Color32::from_rgb(226, 226, 230);
+const TEXT_DIM: Color32 = Color32::from_rgb(160, 160, 168);
 
 fn white(alpha: u8) -> Color32 {
-    rgba(255, 255, 255, alpha)
+    Color32::from_rgba_unmultiplied(255, 255, 255, alpha)
 }
 
-/// Apply the application theme once at startup.
+/// Set once at startup.
 pub fn apply(ctx: &egui::Context) {
     let mut style = (*ctx.style()).clone();
-
-    style.spacing.item_spacing = egui::vec2(9.0, 9.0);
-    style.spacing.button_padding = egui::vec2(12.0, 7.0);
-    style.spacing.window_margin = Margin::same(14);
+    style.spacing.item_spacing = egui::vec2(10.0, 9.0);
+    style.spacing.button_padding = egui::vec2(14.0, 6.0);
+    style.spacing.window_margin = Margin::same(16);
 
     let visuals = &mut style.visuals;
     *visuals = egui::Visuals::dark();
-
-    visuals.override_text_color = Some(rgba(238, 242, 255, 255));
-
-    // Keep the native window opaque, but make egui panels transparent.
+    visuals.override_text_color = Some(TEXT);
     visuals.panel_fill = Color32::TRANSPARENT;
-
-    // Floating dialogs.
-    visuals.window_fill = rgba(24, 30, 52, 205);
-    visuals.window_stroke = Stroke::new(1.0, white(45));
-    visuals.window_corner_radius = CornerRadius::same(14);
-
-    visuals.window_shadow = Shadow {
-        offset: [0, 10],
-        blur: 30,
-        spread: 0,
-        color: rgba(0, 0, 0, 100),
-    };
-
+    // Dialogs are denser than the window so text stays readable over whatever is behind.
+    visuals.window_fill = Color32::from_rgba_unmultiplied(30, 30, 33, 240);
+    visuals.window_stroke = Stroke::new(1.0_f32, white(38));
+    visuals.window_corner_radius = CornerRadius::same(16);
+    visuals.window_shadow = Shadow { offset: [0, 12], blur: 36, spread: 0, color: Color32::from_black_alpha(120) };
     visuals.popup_shadow = visuals.window_shadow;
     visuals.menu_corner_radius = CornerRadius::same(10);
+    visuals.extreme_bg_color = Color32::from_rgba_unmultiplied(0, 0, 0, 70); // text fields
+    visuals.faint_bg_color = white(6);
+    visuals.selection.bg_fill = white(34);
+    visuals.selection.stroke = Stroke::new(1.0_f32, Color32::WHITE);
+    visuals.hyperlink_color = Color32::WHITE;
 
-    // Input fields.
-    visuals.extreme_bg_color = rgba(10, 14, 30, 115);
-    visuals.faint_bg_color = white(12);
-
-    // Selection.
-    visuals.selection.bg_fill = rgba(96, 148, 255, 100);
-    visuals.selection.stroke = Stroke::new(1.0, ACCENT);
-
-    visuals.hyperlink_color = ACCENT;
-
-    // Flat translucent widgets.
+    // Flat and outlined: a hairline at rest, a light wash on hover, no size change.
     let widgets = &mut visuals.widgets;
-
-    for (state, alpha) in [
-        (&mut widgets.inactive, 12),
-        (&mut widgets.hovered, 28),
-        (&mut widgets.active, 42),
-        (&mut widgets.open, 24),
+    for (state, fill, edge, text) in [
+        (&mut widgets.inactive, 0, 42, TEXT),
+        (&mut widgets.hovered, 18, 90, Color32::WHITE),
+        (&mut widgets.active, 34, 130, Color32::WHITE),
+        (&mut widgets.open, 18, 90, Color32::WHITE),
     ] {
-        state.bg_fill = white(alpha);
-        state.weak_bg_fill = white(alpha);
-        state.bg_stroke = Stroke::NONE;
+        state.bg_fill = white(fill);
+        state.weak_bg_fill = white(fill);
+        state.bg_stroke = Stroke::new(1.0_f32, white(edge));
         state.corner_radius = CornerRadius::same(8);
         state.expansion = 0.0;
-        state.fg_stroke = Stroke::new(
-            1.0,
-            rgba(238, 242, 255, 255),
-        );
+        state.fg_stroke = Stroke::new(1.0_f32, text);
     }
-
-    widgets.noninteractive.bg_stroke = Stroke::new(1.0, white(30));
-    widgets.noninteractive.fg_stroke =
-        Stroke::new(1.0, rgba(214, 220, 236, 255));
+    widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, white(24)); // separators
+    widgets.noninteractive.fg_stroke = Stroke::new(1.0_f32, TEXT_DIM);
     widgets.noninteractive.corner_radius = CornerRadius::same(8);
-
     ctx.set_style(style);
 }
 
-/// Main glass panel.
-
-
+/// The frame of a main-window panel: a barely lighter pane with a hairline edge.
 pub fn glass() -> Frame {
     Frame::new()
-        .fill(rgba(255, 255, 255, 22))
-        .stroke(Stroke::new(1.0, white(55)))
-        .corner_radius(CornerRadius::same(14))
+        .fill(white(5))
+        .stroke(Stroke::new(1.0_f32, white(26)))
+        .corner_radius(CornerRadius::same(16))
         .inner_margin(Margin::same(14))
         .outer_margin(Margin::same(6))
-        .shadow(Shadow {
-            offset: [0, 6],
-            blur: 24,
-            spread: 0,
-            color: rgba(0, 0, 0, 45),
-        })
 }
 
-
-/// Background gradient.
+/// The smoke tint over the blurred desktop, a little lighter towards the top.
 pub fn paint_background(ctx: &egui::Context) {
     let rect = ctx.screen_rect();
     let painter = ctx.layer_painter(egui::LayerId::background());
-
+    let top = Color32::from_rgba_unmultiplied(44, 44, 48, BACKDROP);
+    let bottom = Color32::from_rgba_unmultiplied(22, 22, 24, BACKDROP);
     let mut mesh = egui::Mesh::default();
-
-    let corners = [
-        (rect.left_top(), rgba(38, 30, 84, BACKDROP)),
-        (rect.right_top(), rgba(20, 44, 92, BACKDROP)),
-        (rect.left_bottom(), rgba(16, 22, 48, BACKDROP)),
-        (rect.right_bottom(), rgba(14, 62, 78, BACKDROP)),
-    ];
-
-    for (pos, color) in corners {
+    for (pos, color) in [(rect.left_top(), top), (rect.right_top(), top), (rect.left_bottom(), bottom), (rect.right_bottom(), bottom)] {
         mesh.colored_vertex(pos, color);
     }
-
     mesh.add_triangle(0, 1, 2);
     mesh.add_triangle(1, 2, 3);
     painter.add(mesh);
-
-    // Soft purple glow.
-    let glow = |center: egui::Pos2, radius: f32, color: [u8; 3]| {
-        const SEGMENTS: u32 = 64;
-
-        let mut mesh = egui::Mesh::default();
-
-        mesh.colored_vertex(
-            center,
-            rgba(color[0], color[1], color[2], 75),
-        );
-
-        for i in 0..=SEGMENTS {
-            let angle = i as f32 / SEGMENTS as f32
-                * std::f32::consts::TAU;
-
-            mesh.colored_vertex(
-                center + radius * egui::vec2(angle.cos(), angle.sin()),
-                Color32::TRANSPARENT,
-            );
-        }
-
-        for i in 1..=SEGMENTS {
-            mesh.add_triangle(0, i, i + 1);
-        }
-
-        painter.add(mesh);
-    };
-
-    glow(
-        rect.left_top()
-            + egui::vec2(rect.width() * 0.22, rect.height() * 0.25),
-        rect.height() * 0.7,
-        [150, 90, 255],
-    );
-
-    glow(
-        rect.right_bottom()
-            - egui::vec2(rect.width() * 0.2, rect.height() * 0.2),
-        rect.height() * 0.8,
-        [40, 200, 210],
-    );
 }
