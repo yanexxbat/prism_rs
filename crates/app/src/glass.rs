@@ -244,34 +244,35 @@ mod tests {
         Color32::from_rgb(mix(top.r(), below.r()), mix(top.g(), below.g()), mix(top.b(), below.b()))
     }
 
-    /// Lesbarkeit zuerst: the desktop behind the glass can be pure white. Every text colour
-    /// keeps 4.5:1 there, on the brightest spot: under the sheen,
-    /// inside a selected tile, and in dialogs.
+    /// Readability over what is behind the glass, on the brightest spot: under the sheen,
+    /// inside a selected tile, and in dialogs. Every text colour keeps 4.5:1 over a light grey
+    /// desktop (#C8C8C8). The glass was made clearer on request, so over pure white the text
+    /// drops below that; the second limit only catches it getting worse.
     #[test]
-    fn text_stays_readable_over_a_white_desktop() {
-        let [r, g, b, a] = ACRYLIC_TINT;
-        let blurred = over(Color32::WHITE, Color32::from_rgba_unmultiplied(r, g, b, a));
-        let glass = |tint| over(over(blurred, tint), theme::GLASS_SHEEN);
-        let unblurred = over(over(Color32::WHITE, theme::GLASS_TINT_UNBLURRED), theme::GLASS_SHEEN);
+    fn text_stays_readable_over_a_light_desktop() {
         let ctx = egui::Context::default();
         theme::apply(&ctx);
         let visuals = ctx.style().visuals.clone();
-        for (place, background) in [("glass", glass(theme::GLASS_TINT)), ("glass without blur", unblurred)] {
-            let selected_tile = over(background, white(16));
-            for (name, text, on) in [
-                ("TEXT", theme::TEXT, selected_tile),
-                ("TEXT_TITLE", theme::TEXT_TITLE, over(background, white(6))),
-                ("TEXT_DIM", theme::TEXT_DIM, over(background, white(6))),
-                ("dialog text", visuals.text_color(), over(background, visuals.window_fill)),
-                ("weak dialog text", visuals.weak_text_color(), over(background, visuals.window_fill)),
-            ] {
-                let ratio = theme::contrast(text, on);
-                assert!(ratio >= 4.5, "{name} on {place} {on:?}: {ratio:.2}");
+        let [r, g, b, a] = ACRYLIC_TINT;
+        for (desktop, minimum) in [(Color32::from_gray(200), 4.5), (Color32::WHITE, 3.8)] {
+            let blurred = over(desktop, Color32::from_rgba_unmultiplied(r, g, b, a));
+            let glass = over(over(blurred, theme::GLASS_TINT), theme::GLASS_SHEEN);
+            let unblurred = over(over(desktop, theme::GLASS_TINT_UNBLURRED), theme::GLASS_SHEEN);
+            for (place, background) in [("glass", glass), ("glass without blur", unblurred)] {
+                for (name, text, on) in [
+                    ("TEXT", theme::TEXT, over(background, white(16))),
+                    ("TEXT_TITLE", theme::TEXT_TITLE, over(background, white(6))),
+                    ("TEXT_DIM", theme::TEXT_DIM, over(background, white(6))),
+                    ("dialog text", visuals.text_color(), over(background, visuals.window_fill)),
+                    ("weak dialog text", visuals.weak_text_color(), over(background, visuals.window_fill)),
+                ] {
+                    let ratio = theme::contrast(text, on);
+                    assert!(ratio >= minimum, "{name} on {place} over {desktop:?}: {ratio:.2}, needs {minimum}");
+                }
             }
+            println!("desktop {desktop:?}: glass {glass:?}, TEXT_DIM {:.2}:1", theme::contrast(theme::TEXT_DIM, over(glass, white(6))));
         }
-        println!("white desktop through the glass: {:?}, TEXT_DIM {:.2}:1", glass(theme::GLASS_TINT), theme::contrast(theme::TEXT_DIM, over(glass(theme::GLASS_TINT), white(6))));
     }
-
     #[test]
     fn the_sheen_stays_inside_the_rounded_corners() {
         let panel = Rect::from_min_size(pos2(0.0, 0.0), window_size());

@@ -119,10 +119,10 @@ not follow the original's Qt themes. How it is built:
   1 px edge. On Windows the window is clipped (`SetWindowRgn`) to its rounded shape, so
   the corners are really transparent. Without acrylic (other systems, or if the call
   fails) the tint is denser, since the desktop would show through sharp.
-- The desktop behind the glass may be white, and text contrast comes first:
-  `glass::tests::text_stays_readable_over_a_white_desktop` checks every text colour on a
-  white desktop (4.6:1 for the dimmest). That decides how dark the glass is; over a dark
-  desktop it looks nearly black.
+- The glass is as clear as the user asked for (tint 0.25).
+  `glass::tests::text_stays_readable_over_a_light_desktop` checks every text colour: at
+  least 4.5:1 over a light grey desktop (#C8C8C8, 5.3:1 for the dimmest), but only 4.0:1
+  over pure white, which is below WCAG AA. That trade was made on purpose.
 - The glass repaints only when the UI changes; nothing animates while idle.
 
 Changes of layout, not of function: the toolbar became a header with a title, the

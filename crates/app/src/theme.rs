@@ -8,9 +8,9 @@ use std::sync::Arc;
 pub const ACCENT: Color32 = Color32::from_rgb(236, 241, 248);
 pub const ON_ACCENT: Color32 = Color32::from_rgb(20, 21, 24);
 
-/// The smoky tint over the blurred desktop: rgba(20, 20, 24, 0.35), premultiplied. The desktop
-/// may be white, so it is as light as the text allows (`glass::tests` checks a white desktop).
-pub const GLASS_TINT: Color32 = Color32::from_rgba_premultiplied(7, 7, 8, 89);
+/// The smoky tint over the blurred desktop: rgba(20, 20, 24, 0.25), premultiplied. Clear on
+/// request: text keeps 4.5:1 over light grey, less over pure white (see `glass::tests`).
+pub const GLASS_TINT: Color32 = Color32::from_rgba_premultiplied(5, 5, 6, 64);
 /// Where Windows does not blur, the desktop would show through sharp: a denser tint.
 pub const GLASS_TINT_UNBLURRED: Color32 = Color32::from_rgba_premultiplied(18, 18, 22, 222);
 /// Light falling on the glass from above, at the top edge; it fades out downwards.
