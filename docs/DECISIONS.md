@@ -109,10 +109,41 @@ through egui's accessibility tree and click them. This is why the `accesskit` fe
 of eframe is enabled. A real window only repaints while it is visible, so scripted clicks
 on the window itself were not reliable.
 
-## The one `unsafe` block
+## The glass look
 
-`crates/app/src/acrylic.rs` calls `SetWindowCompositionAttribute` from user32 to blur
-what is behind the window. It is undocumented, so it needs raw FFI. The documented
-ways were tried first and are opaque on Windows 11: the system backdrop goes solid when
-the window is inactive, and the plain blur accent renders as a dark layer. If the call
-is missing, the window stays see-through without blur.
+The GUI is a dark frosted-glass panel with chrome spheres and a torus behind it. It does
+not follow the original's Qt themes. How it is built:
+
+- The window is undecorated and transparent, and a little larger than the panel. The
+  chrome that sticks out of the panel is drawn sharp in that margin. On Windows the
+  window is clipped (`SetWindowRgn`) to the rounded panel and those spheres, so the
+  corners are really transparent and clicks next to the panel reach what is behind.
+- The chrome is pre-rendered (`crates/app/assets/chrome/render_chrome.py`, Blender and
+  Cycles, lit by Blender's bundled CC0 studio HDRI) and drawn as sprites.
+- The blur runs on the GPU through a glow paint callback: backdrop and sprites at a
+  quarter of the size, four separable Gaussian passes (sigma 20 px). Without a glow
+  context (tests, other renderers) the CPU computes the same picture. Either runs only
+  when the panel size or the pointer parallax changes, so an idle window does not repaint.
+- Text contrast decides the glass: the brief's tint, rgba(40, 40, 42, 0.78), left the
+  grey captions at 3.2:1 over the bright chrome. The tint is 0.86, and
+  `glass::tests::text_stays_readable_over_the_brightest_glass` checks every text colour
+  against the brightest spot of the blurred panel (4.7:1 for the dimmest).
+- The Windows acrylic blur is optional (Settings, Appearance, `GlassAcrylic` in
+  prismlauncher.cfg). It blurs the desktop instead of the chrome, so the chrome is not
+  drawn then, and the glass is darker still because the desktop may be white.
+
+Changes of layout, not of function: the toolbar became a header with a title, the
+"Add Instance" and "Reload" buttons and a navigation (Instances, Accounts, Mods, Settings).
+"Mods" moved from the instance actions into the navigation and needs a selected instance.
+Launch, Folder, Log and Edit are round icons at the bottom right of the instance details;
+their accessible names are unchanged, as are the instance tiles' (the old list text).
+
+## `unsafe` code
+
+- `crates/app/src/acrylic.rs` calls `SetWindowCompositionAttribute` from user32 to blur
+  what is behind the window. It is undocumented, so it needs raw FFI. The documented
+  ways were tried first and are opaque on Windows 11: the system backdrop goes solid when
+  the window is inactive, and the plain blur accent renders as a dark layer. If the call
+  is missing, the window stays see-through without blur. The same file clips the window
+  with GDI regions.
+- `crates/app/src/blur.rs` makes OpenGL calls through glow for the blur.
