@@ -40,7 +40,6 @@ struct SettingsDraft {
     client_id: String,
     curseforge_key: String,
     javas: Vec<JavaInstall>,
-    acrylic: bool,
 }
 
 struct InstanceEdit {
@@ -248,7 +247,6 @@ impl App {
             client_id: get.get("MSAClientIDOverride"),
             curseforge_key: get.get("FlameKeyOverride"),
             javas: Vec::new(),
-            acrylic: get.get_bool("GlassAcrylic"),
         });
     }
 
@@ -590,9 +588,6 @@ impl App {
             });
             ui.weak("Both are stored in prismlauncher.cfg in the data folder. Environment variables take precedence.");
             ui.separator();
-            ui.strong("Appearance");
-            ui.add_enabled(cfg!(windows), egui::Checkbox::new(&mut draft.acrylic, "Use the Windows acrylic blur instead of the built-in glass"));
-            ui.separator();
             save = ui.button("Save").clicked();
         });
         if detect {
@@ -612,7 +607,6 @@ impl App {
             global.set("AutomaticJavaSwitch", draft.auto_java);
             global.set("MSAClientIDOverride", draft.client_id.trim());
             global.set("FlameKeyOverride", draft.curseforge_key.trim());
-            global.set("GlassAcrylic", draft.acrylic);
             self.status = match global.save() {
                 Ok(()) => "Settings saved.".into(),
                 Err(e) => format!("Could not save settings: {e}"),

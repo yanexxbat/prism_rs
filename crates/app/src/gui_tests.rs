@@ -87,7 +87,7 @@ fn dialogs_work_without_network() {
     click(&mut ui, Role::Button, "Save");
     assert_eq!(ui.state().status, "Settings saved.");
     let cfg = std::fs::read_to_string(dir.path().join("prismlauncher.cfg")).expect("cfg");
-    assert!(cfg.contains("LaunchMaximized=true") && cfg.contains("MaxMemAlloc=4096") && cfg.contains("GlassAcrylic=false"), "{cfg}");
+    assert!(cfg.contains("LaunchMaximized=true") && cfg.contains("MaxMemAlloc=4096"), "{cfg}");
 
     // The instance editor writes override flags to instance.cfg.
     click(&mut ui, Role::Button, "Edit");
@@ -107,9 +107,9 @@ fn dialogs_work_without_network() {
     assert!(ui.query_by_label_contains("no mod loader").is_some());
 }
 
-/// The glass panel, the chrome around it and the instance list, rendered with wgpu and
-/// compared with `tests/snapshots/glass_panel.png`. This is the CPU blur; the GPU blur
-/// needs the real window. After a deliberate change of the look:
+/// The glass and the instance list, rendered with wgpu and compared with
+/// `tests/snapshots/glass_panel.png` (over transparency: the desktop and its blur exist only
+/// in the real window). After a deliberate change of the look:
 ///
 /// ```text
 /// UPDATE_SNAPSHOTS=1 cargo test -p prism-app glass_panel

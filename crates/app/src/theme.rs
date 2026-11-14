@@ -1,4 +1,4 @@
-//! The look: a dark frosted-glass panel with chrome objects blurred behind it (see `glass.rs`).
+//! The look: the window is a pane of dark frosted glass over the desktop (see `glass.rs`).
 //! Every colour lives here. One accent only, a cool white; the rest is grey.
 
 use eframe::egui::{self, Color32, CornerRadius, FontFamily, FontId, Frame, Margin, Shadow, Stroke, TextStyle};
@@ -8,28 +8,26 @@ use std::sync::Arc;
 pub const ACCENT: Color32 = Color32::from_rgb(236, 241, 248);
 pub const ON_ACCENT: Color32 = Color32::from_rgb(20, 21, 24);
 
-/// What the glass blurs: near black, a little lighter in the middle.
-pub const BACKDROP_CENTER: Color32 = Color32::from_rgb(0x15, 0x15, 0x17);
-pub const BACKDROP_EDGE: Color32 = Color32::from_rgb(0x0E, 0x0E, 0x10);
-/// The glass itself over the blurred backdrop: rgba(40, 40, 42, 0.86), premultiplied. The brief
-/// asked for 0.78; that left the dim text at 3.2:1 over the bright chrome, so it is darker.
-pub const GLASS_TINT: Color32 = Color32::from_rgba_premultiplied(34, 34, 36, 219);
+/// The smoky tint over the blurred desktop: rgba(20, 20, 24, 0.5), premultiplied. The desktop
+/// may be white, so it is as light as the text allows (`glass::tests` checks a white desktop).
+pub const GLASS_TINT: Color32 = Color32::from_rgba_premultiplied(10, 10, 12, 128);
+/// Where Windows does not blur, the desktop would show through sharp: a denser tint.
+pub const GLASS_TINT_UNBLURRED: Color32 = Color32::from_rgba_premultiplied(18, 18, 22, 222);
+/// Light falling on the glass from above, at the top edge; it fades out downwards.
+pub const GLASS_SHEEN: Color32 = white(10);
 /// The panel's 1 px edge, and the brighter strip along its top.
-pub const GLASS_EDGE: Color32 = white(31);
-pub const GLASS_EDGE_TOP: Color32 = white(64);
+pub const GLASS_EDGE: Color32 = white(40);
+pub const GLASS_EDGE_TOP: Color32 = white(80);
 /// Strength of the film grain, as a fraction of full white or black.
 pub const GRAIN: f32 = 0.04;
 pub const PANEL_RADIUS: u8 = 28;
-/// With the Windows acrylic backdrop the desktop shows through instead of the chrome, and it
-/// can be white, so this glass is darker (`glass::tests` checks the worst case).
-pub const GLASS_TINT_ACRYLIC: Color32 = Color32::from_rgba_premultiplied(35, 35, 37, 222);
 
 /// Body text, nearly white.
-pub const TEXT: Color32 = Color32::from_rgb(236, 236, 239);
-/// Bold titles: a muted grey, as in the reference.
-pub const TEXT_TITLE: Color32 = Color32::from_rgb(204, 204, 209);
+pub const TEXT: Color32 = Color32::from_rgb(242, 242, 245);
+/// Bold titles: a muted light grey.
+pub const TEXT_TITLE: Color32 = Color32::from_rgb(226, 226, 231);
 /// Small captions, idle navigation, hints. The darkest text; `glass::tests` checks its contrast.
-pub const TEXT_DIM: Color32 = Color32::from_rgb(192, 192, 198);
+pub const TEXT_DIM: Color32 = Color32::from_rgb(216, 216, 222);
 
 /// Close, minimise, maximise. The only colour in the window, as on a Mac.
 pub const TRAFFIC_LIGHTS: [Color32; 3] = [Color32::from_rgb(255, 95, 87), Color32::from_rgb(254, 188, 46), Color32::from_rgb(40, 200, 64)];

@@ -4,7 +4,6 @@
 #[cfg(windows)]
 mod acrylic;
 mod app;
-mod blur;
 mod glass;
 #[cfg(test)]
 mod gui_tests;
@@ -89,7 +88,7 @@ fn main() -> std::process::ExitCode {
         let data_dir = std::path::absolute(&data_dir).map_err(|e| format!("{}: {e}", data_dir.display()))?;
         std::fs::create_dir_all(&data_dir).map_err(|e| format!("{}: {e}", data_dir.display()))?;
         let runtime = tokio::runtime::Runtime::new().map_err(|e| format!("could not start the async runtime: {e}"))?;
-        let mut state = app::App::new(runtime.handle().clone(), data_dir, cli).map_err(|e| e.to_string())?;
+        let state = app::App::new(runtime.handle().clone(), data_dir, cli).map_err(|e| e.to_string())?;
         let options = eframe::NativeOptions {
             viewport: eframe::egui::ViewportBuilder::default()
                 .with_inner_size(glass::window_size())
@@ -99,8 +98,7 @@ fn main() -> std::process::ExitCode {
                 .with_decorations(false),
             ..Default::default()
         };
-        eframe::run_native("prism_rs", options, Box::new(move |creation| {
-            state.glass.init_gl(creation.gl.as_deref());
+        eframe::run_native("prism_rs", options, Box::new(move |_creation| {
             Ok(Box::new(state))
         })).map_err(|e| e.to_string())
     };

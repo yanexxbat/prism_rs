@@ -83,8 +83,6 @@ pub struct App {
     cli: Option<Cli>,
     themed: bool,
     pub glass: Glass,
-    /// The glass panel this frame; dialogs stay inside it.
-    pub panel: egui::Rect,
 }
 
 impl App {
@@ -111,7 +109,6 @@ impl App {
             cli: Some(cli).filter(|cli| cli.launch.is_some()),
             themed: false,
             glass: Glass::default(),
-            panel: egui::Rect::ZERO,
         };
         app.reload();
         Ok(app)
@@ -526,11 +523,11 @@ pub fn open_folder(path: &std::path::Path, status: &mut String) {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        self.glass.window(ctx, frame, self.acrylic());
+        self.glass.window(ctx, frame);
         self.ui(ctx);
     }
 
-    /// Nothing behind the panel, so the corners and the margin around it are see-through.
+    /// Nothing behind the glass, so the desktop shows through it and the corners are clear.
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
         [0.0; 4]
     }
@@ -557,13 +554,8 @@ impl App {
                 self.launch(ctx, &id, cli.profile.as_deref(), cli.offline, target);
             }
         }
-        let panel = glass::panel_rect(ctx.screen_rect(), glass::maximized(ctx));
-        self.panel = panel;
-        self.glass.paint(ctx, panel, self.acrylic());
-        // From here on egui treats the panel as the screen, so dialogs, menus and tooltips stay
-        // on the glass: outside it the window is clipped away on Windows.
-        // The real size comes back at the end of the pass for painting.
-        let screen = ctx.input_mut(|i| std::mem::replace(&mut i.screen_rect, panel));
+        let panel = ctx.screen_rect();
+        self.glass.paint(ctx, panel);
         egui::CentralPanel::default().frame(egui::Frame::NONE).show(ctx, |ui| {
             glass::title_bar(ui, panel, self.windows.page().unwrap_or("Instances"));
             ui.scope_builder(egui::UiBuilder::new().max_rect(glass::content_rect(panel)), |ui| {
@@ -580,11 +572,6 @@ impl App {
         });
         self.show_windows(ctx);
         glass::resize_edges(ctx, panel);
-        ctx.input_mut(|i| i.screen_rect = screen);
     }
 
-    /// The Windows acrylic blur instead of the built-in glass (Settings, Appearance).
-    pub fn acrylic(&self) -> bool {
-        cfg!(windows) && self.global.get("GlassAcrylic").is_some_and(prism_core::settings::parse_bool)
-    }
 }
