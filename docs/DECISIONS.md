@@ -111,26 +111,19 @@ on the window itself were not reliable.
 
 ## The glass look
 
-The GUI is a dark frosted-glass panel with chrome spheres and a torus behind it. It does
+The window is a pane of dark frosted glass: the desktop shows through it, blurred. It does
 not follow the original's Qt themes. How it is built:
 
-- The window is undecorated and transparent, and a little larger than the panel. The
-  chrome that sticks out of the panel is drawn sharp in that margin. On Windows the
-  window is clipped (`SetWindowRgn`) to the rounded panel and those spheres, so the
-  corners are really transparent and clicks next to the panel reach what is behind.
-- The chrome is pre-rendered (`crates/app/assets/chrome/render_chrome.py`, Blender and
-  Cycles, lit by Blender's bundled CC0 studio HDRI) and drawn as sprites.
-- The blur runs on the GPU through a glow paint callback: backdrop and sprites at a
-  quarter of the size, four separable Gaussian passes (sigma 20 px). Without a glow
-  context (tests, other renderers) the CPU computes the same picture. Either runs only
-  when the panel size or the pointer parallax changes, so an idle window does not repaint.
-- Text contrast decides the glass: the brief's tint, rgba(40, 40, 42, 0.78), left the
-  grey captions at 3.2:1 over the bright chrome. The tint is 0.86, and
-  `glass::tests::text_stays_readable_over_the_brightest_glass` checks every text colour
-  against the brightest spot of the blurred panel (4.7:1 for the dimmest).
-- The Windows acrylic blur is optional (Settings, Appearance, `GlassAcrylic` in
-  prismlauncher.cfg). It blurs the desktop instead of the chrome, so the chrome is not
-  drawn then, and the glass is darker still because the desktop may be white.
+- The window is undecorated and transparent. Windows' acrylic backdrop blurs what is
+  behind it; egui adds a smoky tint, a soft sheen from above, film grain and a light
+  1 px edge. On Windows the window is clipped (`SetWindowRgn`) to its rounded shape, so
+  the corners are really transparent. Without acrylic (other systems, or if the call
+  fails) the tint is denser, since the desktop would show through sharp.
+- The desktop behind the glass may be white, and text contrast comes first:
+  `glass::tests::text_stays_readable_over_a_white_desktop` checks every text colour on a
+  white desktop (4.8:1 for the dimmest). That decides how dark the glass is; over a dark
+  desktop it looks nearly black.
+- The glass repaints only when the UI changes; nothing animates while idle.
 
 Changes of layout, not of function: the toolbar became a header with a title, the
 "Add Instance" and "Reload" buttons and a navigation (Instances, Accounts, Mods, Settings).
@@ -146,4 +139,3 @@ their accessible names are unchanged, as are the instance tiles' (the old list t
   the window is inactive, and the plain blur accent renders as a dark layer. If the call
   is missing, the window stays see-through without blur. The same file clips the window
   with GDI regions.
-- `crates/app/src/blur.rs` makes OpenGL calls through glow for the blur.

@@ -32,7 +32,7 @@ ships as a single `.exe`.
 - **Mods:** search, install and manage mods from Modrinth and CurseForge
 - **Compatible:** works on Prism Launcher instance folders (`--dir`)
 - **Command line:** launch an instance directly and join a server or world
-- **Look:** a frosted-glass window with blurred chrome behind it, a Mac-style title bar
+- **Look:** a see-through frosted-glass window over the desktop, a Mac-style title bar
   and the Poppins font (see [docs/DECISIONS.md](docs/DECISIONS.md#the-glass-look))
 
 ## Download
@@ -171,7 +171,7 @@ cargo test -p prism-minecraft --test launch -- --ignored --nocapture --test-thre
 cargo test -p prism-app full_flow -- --ignored --nocapture
 ```
 
-`glass_panel_snapshot` compares the rendered main window with
+`glass_panel_snapshot` compares the rendered main window (without the desktop behind it) with
 `crates/app/tests/snapshots/glass_panel.png` (it needs a GPU for wgpu). After a deliberate
 change of the look, `UPDATE_SNAPSHOTS=1 cargo test -p prism-app glass_panel` writes a new one.
 

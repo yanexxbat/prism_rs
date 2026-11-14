@@ -23,9 +23,6 @@ Bundled assets:
 - Poppins (Light, Regular, SemiBold), Copyright 2020 The Poppins Project Authors
   (<https://github.com/itfoundry/Poppins>), licensed under the SIL Open Font License 1.1.
   The licence is in `crates/app/assets/fonts/OFL.txt`.
-- The chrome images in `crates/app/assets/chrome` were rendered for this project with
-  `render_chrome.py`. Their lighting uses Blender's bundled studio HDRI by Greg Zaal
-  (Poly Haven), which is CC0; the HDRI itself is not included.
 
 No logos, icons or other brand assets of Prism Launcher are included. "Prism Launcher"
 is the name of the original project; this port is not affiliated with it. "Minecraft"
